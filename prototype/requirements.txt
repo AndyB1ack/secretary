@@ -1,0 +1,9 @@
+# Прототип для Mac (Apple Silicon). Всё бесплатное, работает офлайн после скачивания моделей.
+llama-cpp-python>=0.3      # языковая модель (llama.cpp, ускорение Metal)
+pywhispercpp>=1.3          # распознавание речи (whisper.cpp)
+silero-vad>=5.1            # детектор речи
+torch>=2.3                 # для Silero TTS и VAD
+numpy>=1.26
+sounddevice>=0.4           # микрофон и динамик
+pyyaml>=6.0
+huggingface_hub>=0.24      # скачивание моделей
