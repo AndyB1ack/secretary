@@ -67,7 +67,7 @@ def from_file(path: str, start: float) -> None:
     sd.play(audio, 24000); sd.wait()
 
 
-def compare(phrase: str) -> None:
+def compare(phrase: str, nfe: int | None = None, only_f5: bool = False) -> None:
     import yaml
     from secretary.engines import make_tts
 
@@ -75,16 +75,19 @@ def compare(phrase: str) -> None:
     models = (HERE / cfg["models_dir"]).resolve()
     if not REF_WAV.exists():
         print("Нет образца голоса. Сначала: python scripts/voice_compare.py --record"); return
-    for engine in ["silero", "f5"]:
+    for engine in (["f5"] if only_f5 else ["silero", "f5"]):
         c = dict(cfg["tts"], engine=engine)
         c["f5"] = {**c["f5"], "ref_audio": REF_WAV, "ref_text": REF_TXT}
+        if nfe:
+            c["f5"]["nfe_step"] = nfe
         print(f"\nЗагружаю {engine}…")
         tts = make_tts(c, models)
         tts.synthesize("Тест.")  # прогрев
         t = time.monotonic()
         audio = tts.synthesize(phrase)
         dt = time.monotonic() - t
-        print(f"▶ {engine}: синтез {dt:.1f} с на {len(audio) / tts.sample_rate:.1f} с речи")
+        label = f"{engine} (nfe {c['f5']['nfe_step']})" if engine == "f5" else engine
+        print(f"▶ {label}: синтез {dt:.1f} с на {len(audio) / tts.sample_rate:.1f} с речи")
         sd.play(audio, tts.sample_rate); sd.wait(); time.sleep(0.8)
 
 
@@ -96,4 +99,7 @@ if __name__ == "__main__":
         start = float(a[a.index("--start") + 1]) if "--start" in a else 30.0
         from_file(a[a.index("--from") + 1], start)
     else:
-        compare(" ".join(a for a in sys.argv[1:]) or PHRASE)
+        a = sys.argv[1:]
+        nfe = int(a[a.index("--nfe") + 1]) if "--nfe" in a else None
+        words = [x for i, x in enumerate(a) if not x.startswith("--") and (i == 0 or a[i - 1] != "--nfe")]
+        compare(" ".join(words) or PHRASE, nfe, only_f5="--f5" in a)
