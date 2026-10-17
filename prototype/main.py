@@ -377,3 +377,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    # Выходим сразу: иначе Metal (llama.cpp) падает с GGML_ASSERT при очистке — безвредно, но пугает.
+    import os
+    import sys
+    sys.stdout.flush()
+    os._exit(0)
