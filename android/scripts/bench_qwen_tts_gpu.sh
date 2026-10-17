@@ -46,7 +46,9 @@ for TALKER in $("$ADB" shell "ls $DEV" | tr -d '\r' | grep -i talker); do
   echo "== Видеокарта, $TALKER"
   "$ADB" shell "cd $DEV && LD_LIBRARY_PATH=/vendor/lib64:/system/vendor/lib64 ./qwen-tts-gpu --model $TALKER \
      --codec $CODEC --speaker serena --lang Russian --instruct 'slightly happy, warm smile in the voice' \
-     -o out_gpu_$Q.wav < prompt.txt" 2>&1 | grep -E "\[Perf\]|\[Load\]|rror|not available" || true
+     -o out_gpu_$Q.wav < prompt.txt; echo EXIT=\$?" > voice_samples/gpu_log_$Q.txt 2>&1 || true
+  grep -E "\[Perf\]|\[Load\]|rror|not available|EXIT|abort|signal|fault" voice_samples/gpu_log_$Q.txt || true
+  echo "   (весь журнал: voice_samples/gpu_log_$Q.txt)"
   "$ADB" pull $DEV/out_gpu_$Q.wav voice_samples/phone_qwen_gpu_$Q.wav > /dev/null 2>&1 || true
 done
 echo
