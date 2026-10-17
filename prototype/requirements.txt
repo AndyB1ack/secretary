@@ -3,6 +3,7 @@ llama-cpp-python>=0.3      # языковая модель (llama.cpp, уско�
 pywhispercpp>=1.3          # распознавание речи (whisper.cpp)
 silero-vad>=5.1            # детектор речи
 torch>=2.3                 # для Silero TTS и VAD
+omegaconf>=2.3             # нужна Silero TTS
 numpy>=1.26
 sounddevice>=0.4           # микрофон и динамик
 pyyaml>=6.0
