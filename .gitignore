@@ -67,3 +67,4 @@ native/build-qtts-opencl/
 native/vulkan/
 native/build-qtts-vulkan/
 native/*.log
+voice_dataset/
