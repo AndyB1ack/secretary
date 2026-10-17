@@ -5,7 +5,7 @@ models_dir: ../models
 llm:
   engine: llamacpp
   # Одна модель без цензуры на все режимы (ADR 0007). Кандидаты сравниваем на этапе 2.
-  model: Qwen3-4B-Q4_K_M.gguf   # временно, до выбора uncensored-модели
+  model: Huihui-gemma-3n-E4B-it-abliterated.Q4_K_M.gguf   # выбрана 17.10.2026 (ADR 0007)
   context: 8192
   temperature: 0.8
   top_p: 0.9

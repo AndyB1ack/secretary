@@ -12,7 +12,8 @@ MODELS = ROOT / "models"
 
 DOWNLOADS = [
     # (репозиторий, файл, зачем)
-    ("Qwen/Qwen3-4B-GGUF", "Qwen3-4B-Q4_K_M.gguf", "языковая модель, рабочий режим"),
+    ("mradermacher/Huihui-gemma-3n-E4B-it-abliterated-GGUF",
+     "Huihui-gemma-3n-E4B-it-abliterated.Q4_K_M.gguf", "языковая модель, все режимы"),
     ("ggerganov/whisper.cpp", "ggml-small.bin", "распознавание речи"),
 ]
 

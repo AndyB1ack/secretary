@@ -3,10 +3,12 @@
 # Всё в этом списке бесплатно и работает без сети.
 
 llm:
-  name: TBD — одна модель без цензуры на все режимы (ADR 0007)
-  candidates: [abliterated Qwen3 4B, abliterated Qwen3 8B, abliterated Gemma 3 4B]
+  name: Huihui Gemma 3n E4B abliterated (Q4_K_M, GGUF, 4.2 ГБ)
+  repo: mradermacher/Huihui-gemma-3n-E4B-it-abliterated-GGUF
+  file: Huihui-gemma-3n-E4B-it-abliterated.Q4_K_M.gguf
   role: языковая модель, все режимы
-  url: TBD
+  also_tested: [Huihui Qwen3.5 4B abliterated, Huihui Qwen3.5 9B abliterated, Qwen3 4B]
+  url: https://huggingface.co/mradermacher/Huihui-gemma-3n-E4B-it-abliterated-GGUF
   sha256: TBD
 
 stt:
