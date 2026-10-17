@@ -1,6 +1,8 @@
 """Сравнение голосов на одной фразе: Silero (xenia) и F5-TTS (живой, по образцу).
 
   python scripts/voice_compare.py --record     — записать образец голоса (15 секунд)
+  python scripts/voice_compare.py --from файл.mp3 [--start 60]  — взять образец из готовой записи
+                                                (вырезает 15 с с указанной секунды и распознаёт текст)
   python scripts/voice_compare.py              — сравнить
   python scripts/voice_compare.py "своя фраза"
 """
@@ -39,6 +41,25 @@ def record() -> None:
     sd.play(audio, 24000); sd.wait()
 
 
+def from_file(path: str, start: float) -> None:
+    import librosa
+
+    VOICES.mkdir(parents=True, exist_ok=True)
+    audio, _ = librosa.load(path, sr=24000, mono=True, offset=start, duration=15)
+    audio = audio / max(1e-6, float(np.abs(audio).max())) * 0.9
+    sf.write(REF_WAV, audio, 24000)
+    print(f"✓ Вырезал {len(audio) / 24000:.1f} с начиная с {start:.0f}-й секунды. Распознаю текст…")
+    import yaml
+    from secretary.engines import make_stt
+
+    cfg = yaml.safe_load(open(HERE / "config.yaml", encoding="utf-8"))
+    stt = make_stt(cfg["stt"], (HERE / cfg["models_dir"]).resolve())
+    text = stt.transcribe(librosa.resample(audio, orig_sr=24000, target_sr=16000), "ru")
+    REF_TXT.write_text(text, encoding="utf-8")
+    print(f"Текст образца: {text}\nСлушаем образец:")
+    sd.play(audio, 24000); sd.wait()
+
+
 def compare(phrase: str) -> None:
     import yaml
     from secretary.engines import make_tts
@@ -63,5 +84,9 @@ def compare(phrase: str) -> None:
 if __name__ == "__main__":
     if "--record" in sys.argv:
         record()
+    elif "--from" in sys.argv:
+        a = sys.argv
+        start = float(a[a.index("--start") + 1]) if "--start" in a else 30.0
+        from_file(a[a.index("--from") + 1], start)
     else:
         compare(" ".join(a for a in sys.argv[1:]) or PHRASE)
