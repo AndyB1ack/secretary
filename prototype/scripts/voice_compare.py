@@ -45,6 +45,13 @@ def from_file(path: str, start: float) -> None:
     import librosa
 
     VOICES.mkdir(parents=True, exist_ok=True)
+    if path.startswith("http"):
+        import urllib.request
+        local = VOICES / Path(path).name
+        if not local.exists():
+            print(f"↓ скачиваю {local.name}…")
+            urllib.request.urlretrieve(path, local)
+        path = str(local)
     audio, _ = librosa.load(path, sr=24000, mono=True, offset=start, duration=15)
     audio = audio / max(1e-6, float(np.abs(audio).max())) * 0.9
     sf.write(REF_WAV, audio, 24000)
