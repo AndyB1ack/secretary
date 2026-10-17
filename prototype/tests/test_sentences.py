@@ -20,3 +20,12 @@ def test_short_sentences_are_merged():
 def test_strip_think_block():
     assert "".join(_strip_think(iter(["<th", "ink>\n\n</think>\n\n", "При", "вет"]))) == "Привет"
     assert "".join(_strip_think(iter(["При", "вет"]))) == "Привет"
+
+
+def test_strip_plain_thinking():
+    pieces = ["Thinking Process:\n\n1. Analyze", " the request...", "</think>\n\n", "Привет, ", "Андрей!"]
+    assert "".join(_strip_think(iter(pieces))) == "Привет, Андрей!"
+
+
+def test_short_answer_passes():
+    assert "".join(_strip_think(iter(["Да."]))) == "Да."
