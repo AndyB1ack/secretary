@@ -36,7 +36,7 @@ fi
 echo "== Сборка голоса с Vulkan (5–15 минут: компилируются шейдеры)"
 "$CMAKE" -S $SRC -B native/build-qtts-vulkan -G Ninja -DCMAKE_MAKE_PROGRAM="$NINJA" \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-28 \
-  -DCMAKE_C_FLAGS="-march=armv8.7-a" -DCMAKE_CXX_FLAGS="-march=armv8.7-a" \
+  -DCMAKE_C_FLAGS="-march=armv8.7-a" -DCMAKE_CXX_FLAGS="-march=armv8.7-a -I$(pwd)/$VK/spirv/include" \
   -DGGML_VULKAN=ON -DVulkan_INCLUDE_DIR="$(pwd)/$VK/Vulkan-Headers/include" -DVulkan_LIBRARY="$VKLIB" \
   -DVulkan_GLSLC_EXECUTABLE="$GLSLC" \
   -DSPIRV-Headers_DIR="$(pwd)/$VK/spirv/share/cmake/SPIRV-Headers" \
