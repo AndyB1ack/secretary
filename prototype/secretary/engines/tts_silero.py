@@ -14,6 +14,6 @@ class SileroTTS:
         except Exception:  # в старом кэше нет новой версии модели — обновляем список моделей
             self.model, _ = torch.hub.load(**kw, force_reload=True)
 
-    def synthesize(self, text: str) -> np.ndarray:
+    def synthesize(self, text: str, emotion: str | None = None) -> np.ndarray:
         audio = self.model.apply_tts(text=text, speaker=self.speaker, sample_rate=self.sample_rate)
         return audio.numpy().astype(np.float32)

@@ -100,6 +100,7 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
         from secretary.audio import Speaker
         tts = make_tts(cfg["tts"], (HERE / cfg["models_dir"]).resolve())
         speaker = Speaker(tts.sample_rate)
+        enable_emotions(conv, tts)
     switcher = ModeSwitcher()
     print(f"\n{conv.persona.name} на связи (режим {conv.mode}). Команды: /mode <режим>, /tutor he|en|off, "
           "/tasks, /done N, /remember, /forget, /memory, /quit\n"
@@ -137,7 +138,7 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
         for sentence in conv.respond(text):
             print(sentence, end=" ", flush=True)
             if speak:
-                speaker.enqueue(tts.synthesize(sentence))
+                speaker.enqueue(tts.synthesize(sentence, conv.emotion))
                 if first is None:
                     first = time.monotonic() - t0
         for h in conv.last_hits:
@@ -203,6 +204,14 @@ VOICE_HE_RULE = ("Голосовой режим: твой голос читае�
 LATIN = __import__("re").compile(r"[A-Za-z]")
 
 
+def enable_emotions(conv: Conversation, tts) -> None:
+    """Голос умеет эмоции — просим Миру ставить метки тона."""
+    if getattr(tts, "emotional", False):
+        from secretary.emotion import PROMPT
+        if PROMPT not in conv.persona.extra:
+            conv.persona.extra.append(PROMPT)
+
+
 def speakable(text: str) -> str:
     """Оставляет то, что русский голос может прочитать: без еврейских букв и латиницы."""
     t = HEBREW.sub("", text)
@@ -239,19 +248,22 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
     vad = make_vad(cfg["vad"])
     tts = make_tts(cfg["tts"], (HERE / cfg["models_dir"]).resolve())
     speaker = Speaker(tts.sample_rate)
+    enable_emotions(conv, tts)
     barge_in = cfg["audio"].get("barge_in", False)
 
-    tts_q: queue.Queue[str] = queue.Queue()
+    tts_q: queue.Queue = queue.Queue()
     generating = threading.Event()
     timing = {"end_of_speech": 0.0, "first_audio_reported": True}
 
     def tts_worker() -> None:
         while True:
-            sentence = speakable(tts_q.get())
+            item = tts_q.get()
+            sentence, feel = item if isinstance(item, tuple) else (item, None)
+            sentence = speakable(sentence)
             if not sentence:
                 continue
             try:
-                audio = tts.synthesize(sentence)
+                audio = tts.synthesize(sentence, feel)
             except Exception as exc:  # голос не смог прочитать фразу — пропускаем её, но не падаем
                 print(f"   [голос пропустил фразу: {exc.__class__.__name__}]")
                 continue
@@ -293,7 +305,7 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
             timing["first_audio_reported"] = False
             for sentence in conv.respond(text):
                 print(sentence, end=" ", flush=True)
-                tts_q.put(sentence)
+                tts_q.put((sentence, conv.emotion))
             print()
         finally:
             generating.clear()
@@ -344,7 +356,7 @@ def main() -> None:
     p.add_argument("--mode", default="work", choices=["work", "evening", "private", "weekend"])
     p.add_argument("--tutor", choices=["he", "en"])
     p.add_argument("--practice", choices=["talk", "scene", "quiz"], default="talk", help="режим практики иврита")
-    p.add_argument("--voice", choices=["silero", "f5"], help="движок голоса (вместо config.yaml)")
+    p.add_argument("--voice", choices=["silero", "f5", "qwen"], help="движок голоса (вместо config.yaml)")
     p.add_argument("--model", help="файл модели в models/ (вместо указанного в config.yaml)")
     args = p.parse_args()
     cfg = load_config()

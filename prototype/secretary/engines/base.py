@@ -17,7 +17,9 @@ class LLM(Protocol):
 class TTS(Protocol):
     sample_rate: int
 
-    def synthesize(self, text: str) -> np.ndarray: ...
+    def synthesize(self, text: str, emotion: str | None = None) -> np.ndarray:
+        """emotion — метка из secretary.emotion.EMOTIONS; голоса без эмоций её игнорируют."""
+        ...
 
 
 class VAD(Protocol):

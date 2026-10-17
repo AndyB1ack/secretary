@@ -60,3 +60,5 @@ android/lib/.cxx/
 android/build/
 android/app/libs/
 voice_samples/
+native/qwentts.cpp/
+native/build-qtts-android/

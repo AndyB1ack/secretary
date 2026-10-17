@@ -41,7 +41,7 @@ class F5TTS:
         self.nfe = cfg.get("nfe_step", 16)  # меньше — быстрее, больше — чище (по умолчанию в F5 32)
         self.sample_rate = 24000
 
-    def synthesize(self, text: str) -> np.ndarray:
+    def synthesize(self, text: str, emotion: str | None = None) -> np.ndarray:
         wav, sr, _ = self.model.infer(ref_file=self.ref_audio, ref_text=self.ref_text, gen_text=text,
                                       speed=self.speed, nfe_step=self.nfe, remove_silence=False,
                                       show_info=lambda *a, **k: None, progress=None)

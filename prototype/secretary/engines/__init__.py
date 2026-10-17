@@ -30,4 +30,7 @@ def make_tts(cfg: dict, models_dir=None) -> TTS:
     if cfg["engine"] == "silero":
         from .tts_silero import SileroTTS
         return SileroTTS(cfg)
+    if cfg["engine"] == "qwen":
+        from .tts_qwen import QwenTTS
+        return QwenTTS(cfg.get("qwen", {}))
     raise ValueError(f"неизвестный движок TTS: {cfg['engine']}")

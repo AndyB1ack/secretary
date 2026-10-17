@@ -29,6 +29,7 @@ class Conversation:
         self.tutor = Tutor(memory.db) if memory else None
         self.practice = Practice(self.tutor) if self.tutor else None
         self.last_hits = []
+        self.emotion = "спокойно"   # тон текущей фразы для голоса с эмоциями
         if kb:
             persona.docs_status = kb.describe()
         self.greeting = bool(memory and memory.is_first_session_today())
@@ -111,6 +112,8 @@ class Conversation:
         messages += self.history[-self.history_turns * 2:]
         messages.append({"role": "user", "content": user_text})
 
+        from . import emotion as emo
+        self.emotion = emo.MOOD_TO_EMOTION.get(self.persona.mood, emo.DEFAULT)
         splitter = SentenceSplitter()
         full = ""
         t0 = time.monotonic()
@@ -128,14 +131,20 @@ class Conversation:
             full += piece
             self.bus.emit(ev.ASSISTANT_TOKEN, text=piece)
             for sentence in splitter.feed(piece):
+                sentence, self.emotion = emo.extract(sentence, self.emotion)
+                if not sentence:
+                    continue
                 self.bus.emit(ev.ASSISTANT_SENTENCE, text=sentence)
                 yield sentence
         if not self.cancelled:
             for sentence in splitter.flush():
+                sentence, self.emotion = emo.extract(sentence, self.emotion)
+                if not sentence:
+                    continue
                 self.bus.emit(ev.ASSISTANT_SENTENCE, text=sentence)
                 yield sentence
 
-        answer = full.strip() + (" …" if self.cancelled else "")
+        answer = emo.strip(full) + (" …" if self.cancelled else "")
         self.history.append({"role": "user", "content": user_text})
         self.history.append({"role": "assistant", "content": answer})
         if self.memory:
