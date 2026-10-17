@@ -7,7 +7,11 @@ llm:
   # Одна модель без цензуры на все режимы (ADR 0007). Кандидаты сравниваем на этапе 2.
   model: Qwen3-4B-Q4_K_M.gguf   # временно, до выбора uncensored-модели
   context: 8192
-  temperature: 0.7
+  temperature: 0.8
+  top_p: 0.9
+  min_p: 0.05
+  repeat_penalty: 1.1        # меньше повторов одних и тех же фраз
+  presence_penalty: 0.3
   max_tokens: 400
   gpu_layers: -1             # всё на GPU (Metal)
 

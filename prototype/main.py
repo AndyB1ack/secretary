@@ -36,7 +36,7 @@ def build(cfg: dict, mode: str, tutor: str | None) -> tuple[Conversation, EventB
     if tutor:
         persona.tutor = {"language": tutor}
     models_dir = (HERE / cfg["models_dir"]).resolve()
-    print("Загружаю языковую модель…")
+    print(f"Загружаю языковую модель {cfg['llm']['model']}…")
     llm = make_llm(cfg["llm"], models_dir)
     bus = EventBus()
     return Conversation(persona, llm, bus, mode, cfg.get("history_turns", 20)), bus
@@ -170,8 +170,11 @@ def main() -> None:
     p.add_argument("--speak", action="store_true", help="в режиме --text отвечать голосом")
     p.add_argument("--mode", default="work", choices=["work", "evening", "private", "weekend"])
     p.add_argument("--tutor", choices=["he", "en"])
+    p.add_argument("--model", help="файл модели в models/ (вместо указанного в config.yaml)")
     args = p.parse_args()
     cfg = load_config()
+    if args.model:
+        cfg["llm"]["model"] = args.model
     conv, bus = build(cfg, args.mode, args.tutor)
     if args.text:
         text_loop(conv, cfg, args.speak)

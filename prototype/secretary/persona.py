@@ -34,6 +34,13 @@ class Persona:
             f"Сейчас режим «{mode}»: {m['style']}.",
         ]
         lines += [f"- {b}" for b in m.get("behaviours", [])]
+        lines += [f"Правило: {r}." for r in core.get("rules", [])]
+        if core.get("initiative"):
+            lines.append(f"Инициатива: {core['initiative']}.")
+        ex = (d.get("examples") or {}).get(mode) or (d.get("examples") or {}).get("work", [])
+        if ex:
+            lines.append("Примеры твоего тона (не копируй дословно):")
+            lines += [f"Андрей: {e['user']}\nМира: {e['mira']}" for e in ex]
         lines.append(f"Твоё настроение сегодня: {self.mood}. Пусть оно слегка чувствуется в словах.")
         lines.append("Собеседник — Андрей, твой шеф. Отвечай по-русски, если он не просит иначе.")
         if self.tutor:

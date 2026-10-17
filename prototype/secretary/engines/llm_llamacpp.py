@@ -20,7 +20,11 @@ class LlamaCppLLM:
         stream = self.llm.create_chat_completion(
             messages=messages,
             stream=True,
-            temperature=self.cfg.get("temperature", 0.7),
+            temperature=self.cfg.get("temperature", 0.8),
+            top_p=self.cfg.get("top_p", 0.9),
+            min_p=self.cfg.get("min_p", 0.05),
+            repeat_penalty=self.cfg.get("repeat_penalty", 1.1),
+            presence_penalty=self.cfg.get("presence_penalty", 0.3),
             max_tokens=self.cfg.get("max_tokens", 400),
         )
         yield from _strip_think(
