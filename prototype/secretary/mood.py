@@ -15,10 +15,25 @@ DRIFT = {
 }
 
 
+def event_for_today(memory: Memory, events: list[str], rng: random.Random | None = None) -> str:
+    """Одна «новость дня» из её жизни; не повторяется два дня подряд."""
+    if not events:
+        return ""
+    today = date.today().isoformat()
+    row = memory.db.execute("SELECT reason FROM mood WHERE day=?", ("event:" + today,)).fetchone()
+    if row:
+        return row["reason"]
+    last = memory.db.execute("SELECT reason FROM mood WHERE day LIKE 'event:%' ORDER BY day DESC LIMIT 1").fetchone()
+    choices = [e for e in events if not last or e != last["reason"]] or events
+    ev = (rng or random.Random()).choice(choices)
+    memory.set_mood("event:" + today, "event", ev)
+    return ev
+
+
 def mood_for_today(memory: Memory, rng: random.Random | None = None, today: date | None = None) -> tuple[str, str]:
     rng = rng or random.Random()
     today = today or date.today()
-    saved = memory.get_mood(today.isoformat())
+    saved = memory.get_mood(today.isoformat())  # события дня хранятся с префиксом event: и сюда не попадают
     if saved:
         return saved["state"], saved["reason"]
 

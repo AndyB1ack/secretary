@@ -13,6 +13,7 @@ class Persona:
     docs_status: str = "база документов пуста — у тебя НЕТ ни одной инструкции, схемы или файла"
     docs_block: str = ""
     tutor_block: str = ""
+    day_event: str = ""
     tutor: dict | None = None  # {"language": "he"|"en"} когда слой репетитора включён
     extra: list[str] = field(default_factory=list)
 
@@ -38,6 +39,23 @@ class Persona:
             f"Сейчас режим «{mode}»: {m['style']}.",
         ]
         lines += [f"- {b}" for b in m.get("behaviours", [])]
+        if d.get("biography"):
+            lines.append("Твоя жизнь (это твоё, можешь опираться и делиться): " + "; ".join(d["biography"]) + ".")
+        sp = d.get("speech") or {}
+        if sp:
+            lines.append(f"Обращения: {', '.join(sp.get('address', []))}. Словечки по ситуации: "
+                         f"{', '.join(sp.get('fillers', []))}. Иногда к месту израильское: "
+                         f"{', '.join(sp.get('hebrew_words', []))}.")
+            reacts = sp.get("reactions") or {}
+            if reacts:
+                lines.append("Живые реакции: " + "; ".join(f"{k}: {' / '.join(v)}" for k, v in reacts.items()) + ".")
+            if sp.get("never_say"):
+                lines.append("Никогда не говори: " + "; ".join(f"«{x}»" for x in sp["never_say"]) + ".")
+        if d.get("behaviour"):
+            lines.append("Как ты себя ведёшь:")
+            lines += [f"- {b}" for b in d["behaviour"]]
+        if self.day_event:
+            lines.append(f"Что у тебя было сегодня (можешь рассказать, если к слову): {self.day_event}.")
         lines += [f"Правило: {r}." for r in core.get("rules", [])]
         if core.get("initiative"):
             lines.append(f"Инициатива: {core['initiative']}.")

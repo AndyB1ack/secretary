@@ -22,7 +22,7 @@ from secretary.engines import make_llm, make_stt, make_tts, make_vad
 from secretary.events import EventBus
 from secretary.knowledge import KnowledgeBase
 from secretary.memory import Memory, consolidate
-from secretary.mood import mood_for_today
+from secretary.mood import event_for_today, mood_for_today
 from secretary.modes import ModeSwitcher
 from secretary.persona import Persona
 
@@ -48,6 +48,7 @@ def build(cfg: dict, mode: str, tutor: str | None) -> tuple[Conversation, EventB
         for s in pending:
             consolidate(memory, llm, s)
     persona.mood, persona.mood_reason = mood_for_today(memory)
+    persona.day_event = event_for_today(memory, persona.data.get("day_events", []))
     print(f"Настроение Миры сегодня: {persona.mood}")
     bus = EventBus()
     kb = KnowledgeBase(HERE / cfg.get("packs_dir", "../packs"))

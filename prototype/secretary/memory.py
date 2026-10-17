@@ -113,7 +113,7 @@ class Memory:
         return self.db.execute("SELECT * FROM mood WHERE day=?", (day,)).fetchone()
 
     def last_mood(self) -> sqlite3.Row | None:
-        return self.db.execute("SELECT * FROM mood ORDER BY day DESC LIMIT 1").fetchone()
+        return self.db.execute("SELECT * FROM mood WHERE day NOT LIKE 'event:%' ORDER BY day DESC LIMIT 1").fetchone()
 
     def set_mood(self, day: str, state: str, reason: str) -> None:
         self.db.execute("INSERT OR REPLACE INTO mood (day, state, reason) VALUES (?,?,?)", (day, state, reason))
@@ -144,6 +144,7 @@ class Memory:
 CONSOLIDATE_PROMPT = """Ниже разговор Андрея с его ассистенткой Мирой. Сделай выжимку для долговременной памяти.
 Ответь ТОЛЬКО JSON без пояснений, по схеме:
 {"summary": "1–2 предложения: о чём говорили и чем закончилось",
+ "mira_note": "одна фраза от лица Миры: что она почувствовала или подумала об этом разговоре",
  "facts": ["короткие факты об Андрее, его работе, объектах, людях, которые он сам сообщил"],
  "tasks": [{"title": "что нужно сделать", "due": "YYYY-MM-DD или null"}]}
 Правила: только то, что прямо сказано в разговоре; ничего не придумывай; если фактов или задач нет — пустые списки.
@@ -177,7 +178,8 @@ def consolidate(memory: Memory, llm, session: str | None = None) -> dict | None:
     if not data:
         return None
     if data.get("summary"):
-        memory.add_episode(session, scope, str(data["summary"]))
+        note = f" (Мира: {data['mira_note']})" if data.get("mira_note") else ""
+        memory.add_episode(session, scope, str(data["summary"]) + note)
     for f in data.get("facts") or []:
         memory.add_fact(str(f), scope)
     for t in data.get("tasks") or []:
