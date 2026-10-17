@@ -50,7 +50,6 @@ class Persona:
                 "сначала коротко поправь и по-русски объясни, как правильно, потом продолжай разговор."
             )
         lines += self.extra
-        lines.append("/no_think")  # Qwen3: отвечать сразу, без скрытых рассуждений
         return "\n".join(lines)
 
 

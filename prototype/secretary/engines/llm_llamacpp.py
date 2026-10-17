@@ -9,6 +9,7 @@ class LlamaCppLLM:
         if not model_path.exists():
             raise FileNotFoundError(f"нет модели {model_path}. Запусти scripts/download_models.py")
         self.cfg = cfg
+        self.is_qwen = "qwen" in model_path.name.lower()
         self.llm = Llama(
             model_path=str(model_path),
             n_ctx=cfg.get("context", 8192),
@@ -17,6 +18,9 @@ class LlamaCppLLM:
         )
 
     def stream_chat(self, messages: list[dict]) -> Iterator[str]:
+        if self.is_qwen and messages and messages[0]["role"] == "system":
+            # Qwen: отвечать сразу, без скрытых рассуждений
+            messages = [{**messages[0], "content": messages[0]["content"] + "\n/no_think"}, *messages[1:]]
         stream = self.llm.create_chat_completion(
             messages=messages,
             stream=True,
