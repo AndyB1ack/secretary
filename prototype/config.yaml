@@ -28,8 +28,8 @@ vad:
 tts:
   engine: silero             # silero — быстрый; f5 — живой нейросетевой голос по образцу
   language: ru
-  model_id: v4_ru
-  speaker: xenia             # варианты: xenia, baya, kseniya, aidar, eugene
+  model_id: v5_6_ru          # v5_6: вопросы, восклицания, ударения
+  speaker: baya              # варианты: xenia, baya, kseniya, aidar, eugene
   sample_rate: 48000
   f5:
     ref_audio: ../persona/voices/mira_ref.wav   # образец голоса 10–20 с

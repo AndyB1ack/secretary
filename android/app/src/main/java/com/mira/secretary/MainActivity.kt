@@ -119,6 +119,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    /** История жизни Миры (assets/life.json): если Андрей спрашивает о её семье, детстве и т.п. — подсказка к реплике. */
+    private val life: List<Pair<List<String>, String>> by lazy {
+        runCatching {
+            val arr = org.json.JSONArray(assets.open("life.json").bufferedReader().readText())
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                val kw = o.getJSONArray("keywords")
+                (0 until kw.length()).map { kw.getString(it) } to o.getString("story")
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun withLife(text: String): String {
+        val low = text.lowercase()
+        val hits = life.filter { (kw, _) -> kw.any { low.contains(it) } }.take(2).map { it.second }
+        if (hits.isEmpty()) return text
+        return text + "\n\n[Справка о твоей жизни — отвечай своими словами, коротко, ничего сверх этого не придумывай: " +
+            hits.joinToString(" ") + "]"
+    }
+
     private fun send(text: String) {
         inputEt.text = null
         inputEt.isEnabled = false
@@ -133,7 +153,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         var first = 0L
         var tokens = 0
         generationJob = lifecycleScope.launch(Dispatchers.Default) {
-            engine.sendUserPrompt(text, MAX_TOKENS)
+            engine.sendUserPrompt(withLife(text), MAX_TOKENS)
                 .onCompletion {
                     withContext(Dispatchers.Main) {
                         flushSpeech(force = true)

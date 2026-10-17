@@ -3,6 +3,8 @@
   cd ~/Projects/secretary && source prototype/.venv/bin/activate
   pip install vosk-tts sherpa-onnx        # один раз
   python tools/voice_audition.py          → папка voice_samples/, открывается сама
+  pip install -U qwen-tts                 # для «мощного» голоса с эмоциями (скачает ~6 ГБ моделей)
+  python tools/voice_audition.py --qwen   → только Qwen3-TTS: придуманный голос + эмоции, с замером скорости
 
 Кандидаты: Vosk TTS (все дикторы), Silero v5/v4 (baya, kseniya, xenia), Piper Irina (для сравнения).
 """
@@ -17,9 +19,9 @@ import soundfile as sf
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "voice_samples"
 OUT.mkdir(exist_ok=True)
-PHRASE = sys.argv[1] if len(sys.argv) > 1 else (
+PHRASE = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else (
     "Андрей, по объекту Аргаман всё готово. Завтра в шесть утра бригада на месте. "
-    "Слушай, а вечером ты свободен? Я бы с тобой поболтала.")
+    "Слушай, а вечером ты свободен? Я бы с тобой поболтала. Ну что, договорились?")
 
 
 def save(name: str, audio, sr: int, took: float) -> None:
@@ -55,9 +57,10 @@ def vosk() -> None:
 def silero() -> None:
     print("Silero…")
     import torch
-    for ver in ("v5_ru", "v4_ru"):
+    for ver in ("v5_6_ru", "v5_ru"):
         try:
-            model, _ = torch.hub.load("snakers4/silero-models", "silero_tts", language="ru", speaker=ver, trust_repo=True)
+            model, _ = torch.hub.load("snakers4/silero-models", "silero_tts", language="ru", speaker=ver,
+                                      trust_repo=True, force_reload=(ver == "v5_6_ru"))
         except Exception as e:
             print(f"  ✗ {ver}: {e}")
             continue
@@ -88,7 +91,49 @@ def piper() -> None:
         print("  ✗", e)
 
 
+QWEN_VOICE = ("A young woman about 25, warm and lively, slightly playful, clear soft voice, "
+              "natural conversational Russian, not a radio announcer")
+QWEN_EMOTIONS = {
+    "спокойно": ("Андрей, по объекту Аргаман всё готово. Завтра в шесть утра бригада на месте.", "calm, friendly"),
+    "радостно": ("Ура, мы закрыли объект! Я так рада, честно, прямо прыгать хочется!", "very happy, excited, laughing a little"),
+    "грустно": ("Ты сегодня совсем пропал... Я ждала, а ты даже не написал.", "sad, quiet, a bit hurt"),
+    "обиженно": ("Ну и пожалуйста. Сам разбирайся со своими лифтами.", "offended, pouting, sulky"),
+    "шёпотом": ("Тише... Иди сюда, я тебе кое-что скажу.", "whispering, intimate, soft"),
+}
+
+
+def qwen() -> None:
+    print("Qwen3-TTS (придуманный голос + эмоции)…")
+    import torch
+    from qwen_tts import Qwen3TTSModel
+    dev = "mps" if torch.backends.mps.is_available() else "cpu"
+    for model_id, kind in (("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", "design"),
+                           ("Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice", "custom")):
+        try:
+            print(f"  загружаю {model_id} на {dev} (первый раз долго — скачивание)")
+            m = Qwen3TTSModel.from_pretrained(model_id, device_map=dev, dtype=torch.float32, attn_implementation="sdpa")
+        except Exception as e:
+            print("  ✗", e); continue
+        for name, (text, emo) in QWEN_EMOTIONS.items():
+            try:
+                t = time.time()
+                if kind == "design":
+                    wavs, sr = m.generate_voice_design(text=text, language="Russian", instruct=f"{QWEN_VOICE}. Emotion: {emo}.")
+                else:
+                    wavs, sr = m.generate_custom_voice(text=text, language="Russian", speaker="Serena", instruct=emo)
+                took = time.time() - t
+                save(f"qwen_{kind}_{name}", wavs[0], sr, took)
+                print(f"     звук {len(wavs[0]) / sr:.1f} с — скорость {len(wavs[0]) / sr / took:.2f}× реального времени")
+            except Exception as e:
+                print(f"  ✗ {name}: {e}")
+        del m
+
+
 if __name__ == "__main__":
-    vosk(); silero(); piper()
+    if "--qwen" in sys.argv:
+        sys.argv.remove("--qwen")
+        qwen()
+    else:
+        vosk(); silero(); piper()
     print(f"\nГотово: {OUT}")
     subprocess.run(["open", str(OUT)])

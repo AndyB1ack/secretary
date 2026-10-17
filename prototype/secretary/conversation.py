@@ -32,6 +32,9 @@ class Conversation:
         if kb:
             persona.docs_status = kb.describe()
         self.greeting = bool(memory and memory.is_first_session_today())
+        self.day_turn = 0 if self.greeting else 99   # ритм дня включается только в первом разговоре за сегодня
+        self.business = False
+        self.last_day = memory.last_day_before_today() if memory else None
 
     def set_mode(self, mode: str) -> None:
         self.mode = mode
@@ -96,6 +99,12 @@ class Conversation:
                                                "что в курсе этого слова нет и ты не хочешь гадать; предложи проверить через облако.")
             lang = self.persona.tutor["language"]
             self.persona.tutor_block = self.practice.prompt_block() if lang == "he" else ""
+        self.persona.life_block = self.persona.life_for(user_text)
+        from datetime import datetime
+        from .persona import BUSINESS_WORDS, day_phase
+        self.day_turn += 1
+        self.business = self.business or any(w in user_text.lower() for w in BUSINESS_WORDS)
+        self.persona.day_phase = day_phase(self.day_turn, self.mode, datetime.now(), self.last_day, self.business)
         ctx = self.memory.context_block(self.mode) if self.memory else ""
         greeting, self.greeting = self.greeting, False
         messages = [{"role": "system", "content": self.persona.system_prompt(self.mode, ctx, greeting)}]

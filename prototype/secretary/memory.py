@@ -54,6 +54,12 @@ class Memory:
         row = self.db.execute("SELECT max(ts) AS ts FROM messages WHERE session != ?", (self.session,)).fetchone()
         return date.fromisoformat(row["ts"][:10]) if row and row["ts"] else None
 
+    def last_day_before_today(self):
+        """Дата последнего разговора до сегодняшнего дня (или None)."""
+        from datetime import date as _d
+        row = self.db.execute("SELECT max(ts) AS t FROM messages WHERE ts < ?", (date.today().isoformat(),)).fetchone()
+        return _d.fromisoformat(row["t"][:10]) if row and row["t"] else None
+
     def is_first_session_today(self) -> bool:
         row = self.db.execute("SELECT count(*) AS n FROM messages WHERE ts >= ? AND session != ?",
                               (date.today().isoformat(), self.session)).fetchone()
