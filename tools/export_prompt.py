@@ -11,7 +11,7 @@ from secretary.persona import Persona  # noqa: E402
 
 p = Persona.load(ROOT / "persona" / "mira.yaml")
 p.docs_status = "на телефоне база документов пока не подключена — у тебя НЕТ инструкций и схем"
-text = p.system_prompt("work")
+text = p.system_prompt("work", compact=True)  # на телефоне чтение промпта дорогое — короткая версия
 out = ROOT / "android" / "app" / "src" / "main" / "assets" / "system_prompt.txt"
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(text, encoding="utf-8")

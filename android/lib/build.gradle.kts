@@ -30,8 +30,10 @@ android {
                 arguments += "-DLLAMA_OPENSSL=OFF"
 
                 arguments += "-DGGML_NATIVE=OFF"
-                arguments += "-DGGML_BACKEND_DL=ON"
-                arguments += "-DGGML_CPU_ALL_VARIANTS=ON"
+                // Жёстко под Snapdragon 8 Elite (S25): без выбора варианта при запуске — как в замере скорости
+                arguments += "-DGGML_BACKEND_DL=OFF"
+                arguments += "-DGGML_CPU_ALL_VARIANTS=OFF"
+                arguments += "-DGGML_CPU_ARM_ARCH=armv8.7-a"
                 arguments += "-DGGML_LLAMAFILE=OFF"
             }
         }

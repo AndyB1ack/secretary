@@ -27,7 +27,7 @@ class Persona:
         with open(path, encoding="utf-8") as f:
             return cls(yaml.safe_load(f))
 
-    def system_prompt(self, mode: str, memory_context: str = "", greeting: bool = False) -> str:
+    def system_prompt(self, mode: str, memory_context: str = "", greeting: bool = False, compact: bool = False) -> str:
         d = self.data
         core = d["core"]
         m = d["modes"].get(mode) or d["modes"]["work"]
@@ -40,7 +40,7 @@ class Persona:
             f"Сейчас режим «{mode}»: {m['style']}.",
         ]
         lines += [f"- {b}" for b in m.get("behaviours", [])]
-        if d.get("biography"):
+        if d.get("biography") and not compact:
             lines.append("Твоя жизнь (это твоё, можешь опираться и делиться): " + "; ".join(d["biography"]) + ".")
         sp = d.get("speech") or {}
         if sp:
@@ -48,11 +48,11 @@ class Persona:
                          f"{', '.join(sp.get('fillers', []))}. Иногда к месту израильское: "
                          f"{', '.join(sp.get('hebrew_words', []))}.")
             reacts = sp.get("reactions") or {}
-            if reacts:
+            if reacts and not compact:
                 lines.append("Живые реакции: " + "; ".join(f"{k}: {' / '.join(v)}" for k, v in reacts.items()) + ".")
             if sp.get("never_say"):
                 lines.append("Никогда не говори: " + "; ".join(f"«{x}»" for x in sp["never_say"]) + ".")
-        if d.get("behaviour"):
+        if d.get("behaviour") and not compact:
             lines.append("Как ты себя ведёшь:")
             lines += [f"- {b}" for b in d["behaviour"]]
         if self.day_event:
@@ -61,7 +61,7 @@ class Persona:
         if core.get("initiative"):
             lines.append(f"Инициатива: {core['initiative']}.")
         ex = (d.get("examples") or {}).get(mode) or (d.get("examples") or {}).get("work", [])
-        if ex:
+        if ex and not compact:
             lines.append("Примеры твоего тона (не копируй дословно; факты из примеров не настоящие):")
             lines += [f"Андрей: {e['user']}\nМира: {e['mira']}" for e in ex]
         mood = f"Твоё настроение сегодня: {self.mood}"

@@ -71,6 +71,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         inputEt.isEnabled = false
 
         tts = TextToSpeech(this, this)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.RECORD_AUDIO), 2)
+        }
+        startForegroundService(Intent(this, MiraService::class.java))
         fab.setOnClickListener {
             if (!ready) return@setOnClickListener
             val text = inputEt.text.toString().trim()
@@ -95,8 +100,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         engine.loadModel(model.path)
         status("Мира читает свой характер… (первый раз до минуты)")
         val prompt = assets.open(PROMPT_ASSET).bufferedReader().use { it.readText() }
+        val tLoad = System.currentTimeMillis() - t0
         engine.setSystemPrompt(prompt)
         val sec = (System.currentTimeMillis() - t0) / 1000
+        Log.i(TAG, "TIMING load_model=${tLoad}ms system_prompt=${System.currentTimeMillis() - t0 - tLoad}ms chars=${prompt.length}")
         withContext(Dispatchers.Main) {
             ready = true
             fab.isEnabled = true
@@ -118,17 +125,22 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         adapter.notifyItemRangeInserted(messages.size - 2, 2)
         val t0 = System.currentTimeMillis()
         var first = 0L
+        var tokens = 0
         generationJob = lifecycleScope.launch(Dispatchers.Default) {
             engine.sendUserPrompt(text, MAX_TOKENS)
                 .onCompletion {
                     withContext(Dispatchers.Main) {
                         flushSpeech(force = true)
+                        val total = System.currentTimeMillis() - t0
+                        Log.i(TAG, "TIMING first_token=${first}ms total=${total}ms tokens=$tokens " +
+                            "gen_speed=${if (total > first) tokens * 1000.0 / (total - first) else 0.0} tok/s")
                         inputEt.isEnabled = true
                         fab.isEnabled = true
                         statusTv.text = "Ответ: первое слово через ${first / 1000.0} с, всего ${(System.currentTimeMillis() - t0) / 1000.0} с"
                     }
                 }.collect { token ->
                     if (first == 0L && token.isNotBlank()) first = System.currentTimeMillis() - t0
+                    tokens++
                     withContext(Dispatchers.Main) {
                         answer.append(token)
                         messages[messages.size - 1] = messages.last().copy(content = answer.toString().trim())
@@ -201,6 +213,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+        stopService(Intent(this, MiraService::class.java))
         recognizer?.destroy()
         tts.shutdown()
         if (::engine.isInitialized) engine.destroy()
