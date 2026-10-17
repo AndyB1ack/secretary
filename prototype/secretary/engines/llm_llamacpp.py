@@ -19,10 +19,10 @@ class LlamaCppLLM:
             verbose=False,
         )
 
-    def _sampling(self) -> dict:
+    def _sampling(self, temperature: float | None = None) -> dict:
         c = self.cfg
         return dict(
-            temperature=c.get("temperature", 0.8),
+            temperature=c.get("temperature", 0.8) if temperature is None else temperature,
             top_p=c.get("top_p", 0.9),
             min_p=c.get("min_p", 0.05),
             repeat_penalty=c.get("repeat_penalty", 1.1),
@@ -30,15 +30,15 @@ class LlamaCppLLM:
             max_tokens=c.get("max_tokens", 400),
         )
 
-    def stream_chat(self, messages: list[dict]) -> Iterator[str]:
+    def stream_chat(self, messages: list[dict], temperature: float | None = None) -> Iterator[str]:
         if self.is_qwen:
             prompt = "".join(f"<|im_start|>{m['role']}\n{m['content']}<|im_end|>\n" for m in messages)
             prompt += "<|im_start|>assistant\n<think>\n\n</think>\n\n"
             stream = self.llm.create_completion(prompt=prompt, stream=True,
-                                                stop=["<|im_end|>", "<|im_start|>"], **self._sampling())
+                                                stop=["<|im_end|>", "<|im_start|>"], **self._sampling(temperature))
             pieces = (chunk["choices"][0]["text"] for chunk in stream)
         else:
-            stream = self.llm.create_chat_completion(messages=messages, stream=True, **self._sampling())
+            stream = self.llm.create_chat_completion(messages=messages, stream=True, **self._sampling(temperature))
             pieces = (chunk["choices"][0]["delta"].get("content") or "" for chunk in stream)
         yield from _strip_think(pieces)
 

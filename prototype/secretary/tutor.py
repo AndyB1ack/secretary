@@ -194,3 +194,12 @@ def unknown_hebrew(text: str, index: dict[str, list[dict]]) -> list[str]:
         if not any(c in index for c in cands) and raw not in out:
             out.append(raw)
     return out
+
+
+WORD_Q = re.compile(r"(?:что (?:значит|означает)|как переводится|перевод слова|как (?:сказать|будет)(?: на иврите)?|"
+                    r"какое ударение в|как пишется)\s*(?:слово\s*)?[«\"']?([^«»\"'?!.]+)", re.I)
+
+
+def word_question(text: str) -> str | None:
+    m = WORD_Q.search(text)
+    return m.group(1).strip() if m else None

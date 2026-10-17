@@ -37,6 +37,45 @@ class Conversation:
         self.mode = mode
         self.bus.emit(ev.MODE_CHANGED, mode=mode)
 
+    def strict(self) -> bool:
+        """Работа и учёба: только проверенные данные, без выдумок (ADR 0010)."""
+        return self.mode == "work" or bool(self.persona.tutor)
+
+    def _generate(self, messages: list[dict], temperature: float | None) -> str:
+        return "".join(_strip_think(self.llm.stream_chat(messages, temperature)))
+
+    def _validate(self, text: str) -> list[str]:
+        problems = []
+        if self.kb and not self.kb.empty and self.mode == "work":
+            bad = check_citations(text, self.last_hits)
+            if bad:
+                problems.append(f"ссылки на страницы {', '.join(bad)}, которых нет в найденных фрагментах")
+        if self.practice and self.persona.tutor:
+            from .tutor import unknown_hebrew
+            unk = unknown_hebrew(text, self.practice._idx)
+            if unk:
+                problems.append(f"слова на иврите не из словаря курса: {', '.join(unk)}")
+        return problems
+
+    def respond_strict(self, messages: list[dict]) -> str:
+        """Генерирует, проверяет; при нарушении — одна переделка с указанием ошибок; не помогло — честный отказ."""
+        text = self._generate(messages, 0.3)
+        problems = self._validate(text)
+        if problems:
+            fix = messages + [{"role": "assistant", "content": text},
+                              {"role": "user", "content": "СИСТЕМНАЯ ПРОВЕРКА: в ответе " + "; ".join(problems) +
+                               ". Перепиши ответ, используя только данные из блоков «Документы»/«Словарь»/списков слов. "
+                               "Чего там нет — честно скажи, что не знаешь."}]
+            text = self._generate(fix, 0.2)
+            problems = self._validate(text)
+        self.strict_problems = problems
+        if problems:
+            if self.mode == "work" and self.last_hits:
+                h = self.last_hits[0]
+                return f"Не буду гадать. Вот что дословно в документе {h.ref()}: {h.text[:400]}"
+            return "Тут я не уверена и не хочу тебя учить неправильному. Давай проверим по словарю или спросим облако."
+        return text
+
     def respond(self, user_text: str) -> Iterator[str]:
         """Отдаёт ответ по предложениям по мере генерации."""
         self.cancelled = False
@@ -47,6 +86,14 @@ class Conversation:
             self.persona.docs_block = KnowledgeBase.prompt_block(self.last_hits)
         if self.tutor and self.persona.tutor:
             self.tutor.after_user(user_text)
+            from .tutor import word_question
+            asked = word_question(user_text)
+            if asked:
+                hits = self.practice.lookup(asked)
+                if not hits:
+                    self.practice.lookups = []
+                    self.persona.extra_once = (f"Андрей спросил про «{asked}». В словаре курса этого нет: честно скажи, "
+                                               "что в курсе этого слова нет и ты не хочешь гадать; предложи проверить через облако.")
             lang = self.persona.tutor["language"]
             self.persona.tutor_block = self.practice.prompt_block() if lang == "he" else ""
         ctx = self.memory.context_block(self.mode) if self.memory else ""
@@ -59,7 +106,12 @@ class Conversation:
         full = ""
         t0 = time.monotonic()
         first_token_ms = None
-        for piece in _strip_think(self.llm.stream_chat(messages)):
+        self.strict_problems = []
+        if self.strict():
+            stream = iter([self.respond_strict(messages)])
+        else:
+            stream = _strip_think(self.llm.stream_chat(messages))
+        for piece in stream:
             if self.cancelled:
                 break
             if first_token_ms is None and piece.strip():

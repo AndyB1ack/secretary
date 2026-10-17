@@ -58,6 +58,32 @@ def build(cfg: dict, mode: str, tutor: str | None) -> tuple[Conversation, EventB
     return Conversation(persona, llm, bus, mode, cfg.get("history_turns", 20), memory, kb), bus
 
 
+def start_auto_sync(conv: Conversation, every_hours: float = 6) -> None:
+    """Сама подтягивает прогресс из Ivrit Trainer: при запуске и каждые N часов, если есть сеть."""
+    import os
+    url, tok = os.environ.get("IVRIT_URL"), os.environ.get("IVRIT_TOKEN")
+    if not (url and tok and conv.practice):
+        return
+    db = conv.memory.db
+    db.execute("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT)")
+
+    def loop() -> None:
+        while True:
+            row = db.execute("SELECT value FROM kv WHERE key='ivrit_sync'").fetchone()
+            last = float(row[0]) if row else 0.0
+            if time.time() - last >= every_hours * 3600:
+                try:
+                    n = conv.practice.sync_from_app(url, tok)
+                    db.execute("INSERT OR REPLACE INTO kv VALUES ('ivrit_sync', ?)", (str(time.time()),))
+                    db.commit()
+                    print(f"\n   [иврит: синхронизировано {n} слов из приложения]")
+                except Exception:  # нет сети — попробуем позже
+                    pass
+            time.sleep(600)
+
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def finish(conv: Conversation) -> None:
     """При выходе сжимаем разговор в память."""
     if conv.memory:
@@ -315,6 +341,7 @@ def main() -> None:
     conv, bus = build(cfg, args.mode, args.tutor)
     if conv.practice:
         conv.practice.mode = args.practice
+    start_auto_sync(conv)
     if args.text:
         text_loop(conv, cfg, args.speak)
         finish(conv)

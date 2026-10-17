@@ -14,6 +14,7 @@ class Persona:
     docs_block: str = ""
     tutor_block: str = ""
     day_event: str = ""
+    extra_once: str = ""
     tutor: dict | None = None  # {"language": "he"|"en"} когда слой репетитора включён
     extra: list[str] = field(default_factory=list)
 
@@ -91,6 +92,9 @@ class Persona:
                          "задачи или прошлые разговоры — коротко напомни одно главное. Если там пусто — ничего не "
                          "напоминай и НЕ придумывай задач, проектов и дел.")
         lines += self.extra
+        if self.extra_once:
+            lines.append(self.extra_once)
+            self.extra_once = ""
         return "\n".join(lines)
 
 
