@@ -22,6 +22,22 @@ COMMANDS = [
     (r"(сегодня выходной|выходной день)\b", "weekend", True),
 ]
 
+# Голосовые команды практики иврита (без переспроса)
+PRACTICE = [
+    (r"(давай|поговорим|говорим)\s.*(на иврите|по-?еврейски)", "talk"),
+    (r"(давай|сыграем)\s.*(сценк|диалог)", "scene"),
+    (r"(проверь|поспрашивай|опрос)\s.*(слов|меня)", "quiz"),
+    (r"(хватит|стоп|закончим)\s.*(иврит|урок|практик)", "off"),
+]
+
+
+def detect_practice(text: str) -> str | None:
+    low = text.lower().strip(" .!?…")
+    if len(low.split()) > MAX_WORDS:
+        return None
+    return next((m for p, m in PRACTICE if re.search(p, low)), None)
+
+
 # Нейтральные вопросы: посторонний не поймёт, о чём речь
 CONFIRM_QUESTION = {
     "private": "Перерыв? Мне переключиться?",

@@ -135,7 +135,7 @@ class Memory:
             parts.append("Открытые задачи:")
             parts += [f"- [{t['id']}] {t['title']}" + (f" (срок {t['due']})" if t["due"] else "") for t in tasks]
         else:
-            parts.append("Открытых задач нет.")
+            parts.append("Открытых задач нет (не придумывай их).")
         return "\n".join(parts)
 
 

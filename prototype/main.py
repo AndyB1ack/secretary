@@ -23,7 +23,7 @@ from secretary.events import EventBus
 from secretary.knowledge import KnowledgeBase
 from secretary.memory import Memory, consolidate
 from secretary.mood import event_for_today, mood_for_today
-from secretary.modes import ModeSwitcher
+from secretary.modes import ModeSwitcher, detect_practice
 from secretary.persona import Persona
 
 HERE = Path(__file__).resolve().parent
@@ -53,6 +53,8 @@ def build(cfg: dict, mode: str, tutor: str | None) -> tuple[Conversation, EventB
     bus = EventBus()
     kb = KnowledgeBase(HERE / cfg.get("packs_dir", "../packs"))
     print(f"Документы: {kb.describe()}")
+    if not kb.empty:
+        kb.search("прогрев")  # грузим поисковую модель сразу, а не на первом вопросе
     return Conversation(persona, llm, bus, mode, cfg.get("history_turns", 20), memory, kb), bus
 
 
@@ -166,6 +168,31 @@ def memory_command(conv: Conversation, text: str) -> None:
         print(f"  {conv.persona.mood} — {conv.persona.mood_reason}")
 
 
+HEBREW = __import__("re").compile(r"[\u0590-\u05FF]+")
+VOICE_HE_RULE = ("Голосовой режим: твой голос читает только кириллицу. Каждую фразу на иврите пиши так: "
+                 "сначала иврит с огласовками, затем в скобках русская транслитерация с ударением — "
+                 "вслух прозвучит транслитерация, иврит Андрей увидит на экране.")
+
+
+def set_practice(conv: Conversation, practice: str, stt=None) -> None:
+    if practice == "off":
+        conv.persona.tutor = None
+        if stt:
+            stt.language = "ru"
+        print("[практика иврита выключена]")
+        return
+    conv.persona.tutor = {"language": "he"}
+    if practice == "scene":
+        conv.practice.set_scene("")
+    else:
+        conv.practice.mode = practice
+    if stt:
+        stt.language = "auto"  # понимает и русский, и иврит
+        if VOICE_HE_RULE not in conv.persona.extra:
+            conv.persona.extra.append(VOICE_HE_RULE)
+    print(f"[практика иврита: {practice}]")
+
+
 def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
     from secretary.audio import Microphone, Speaker
 
@@ -182,7 +209,9 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
 
     def tts_worker() -> None:
         while True:
-            sentence = tts_q.get()
+            sentence = HEBREW.sub("", tts_q.get()).strip(" ()—-")  # еврейские буквы голос не читает — их видно на экране
+            if not sentence:
+                continue
             audio = tts.synthesize(sentence)
             if conv.cancelled:
                 continue
@@ -193,6 +222,8 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
 
     threading.Thread(target=tts_worker, daemon=True).start()
     switcher = ModeSwitcher()
+    if conv.persona.tutor:
+        set_practice(conv, conv.practice.mode, stt)
 
     def handle(audio: np.ndarray) -> None:
         generating.set()
@@ -204,6 +235,10 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
                 return
             print(f"\nТы: {text}   [распознано за {_ms(stt_ms)}]")
             bus.emit(ev.USER_SAID, text=text, stt_ms=int(stt_ms * 1000))
+            practice = detect_practice(text)
+            if practice:
+                set_practice(conv, practice, stt)
+                text = "Начинаем!" if practice != "off" else "Всё, хватит иврита на сегодня."
             mode, say, handled = switcher.handle(text, conv.mode)
             if mode:
                 conv.set_mode(mode); print(f"[режим: {mode}]")
@@ -266,6 +301,7 @@ def main() -> None:
     p.add_argument("--speak", action="store_true", help="в режиме --text отвечать голосом")
     p.add_argument("--mode", default="work", choices=["work", "evening", "private", "weekend"])
     p.add_argument("--tutor", choices=["he", "en"])
+    p.add_argument("--practice", choices=["talk", "scene", "quiz"], default="talk", help="режим практики иврита")
     p.add_argument("--voice", choices=["silero", "f5"], help="движок голоса (вместо config.yaml)")
     p.add_argument("--model", help="файл модели в models/ (вместо указанного в config.yaml)")
     args = p.parse_args()
@@ -275,6 +311,8 @@ def main() -> None:
     if args.model:
         cfg["llm"]["model"] = args.model
     conv, bus = build(cfg, args.mode, args.tutor)
+    if conv.practice:
+        conv.practice.mode = args.practice
     if args.text:
         text_loop(conv, cfg, args.speak)
         finish(conv)
