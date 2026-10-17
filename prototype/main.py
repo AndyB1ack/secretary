@@ -22,7 +22,7 @@ from secretary.engines import make_llm, make_stt, make_tts, make_vad
 from secretary.events import EventBus
 from secretary.memory import Memory, consolidate
 from secretary.mood import mood_for_today
-from secretary.modes import detect_mode_command
+from secretary.modes import ModeSwitcher
 from secretary.persona import Persona
 
 HERE = Path(__file__).resolve().parent
@@ -68,6 +68,7 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
         from secretary.audio import Speaker
         tts = make_tts(cfg["tts"], (HERE / cfg["models_dir"]).resolve())
         speaker = Speaker(tts.sample_rate)
+    switcher = ModeSwitcher()
     print(f"\n{conv.persona.name} на связи (режим {conv.mode}). Команды: /mode <режим>, /tutor he|en|off, "
           "/tasks, /done N, /remember факт, /forget слово, /memory, /quit\n")
     while True:
@@ -87,8 +88,15 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
             arg = text.split()[-1]
             conv.persona.tutor = None if arg == "off" else {"language": arg}
             print(f"[репетитор: {arg}]"); continue
-        if (mode := detect_mode_command(text)):
+        mode, say, handled = switcher.handle(text, conv.mode)
+        if mode:
             conv.set_mode(mode); print(f"[режим: {mode}]")
+        if say:
+            print(f"{conv.persona.name}: {say}")
+            if speak:
+                speaker.enqueue(tts.synthesize(say))
+        if handled:
+            continue
         print(f"{conv.persona.name}: ", end="", flush=True)
         t0 = time.monotonic()
         first = None
@@ -148,6 +156,7 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
                 print(f"   [первый звук через {_ms(time.monotonic() - timing['end_of_speech'])} после твоей фразы]")
 
     threading.Thread(target=tts_worker, daemon=True).start()
+    switcher = ModeSwitcher()
 
     def handle(audio: np.ndarray) -> None:
         generating.set()
@@ -159,8 +168,14 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
                 return
             print(f"\nТы: {text}   [распознано за {_ms(stt_ms)}]")
             bus.emit(ev.USER_SAID, text=text, stt_ms=int(stt_ms * 1000))
-            if (mode := detect_mode_command(text)):
+            mode, say, handled = switcher.handle(text, conv.mode)
+            if mode:
                 conv.set_mode(mode); print(f"[режим: {mode}]")
+            if say:
+                print(f"{conv.persona.name}: {say}")
+                tts_q.put(say)
+            if handled:
+                return
             print(f"{conv.persona.name}: ", end="", flush=True)
             timing["first_audio_reported"] = False
             for sentence in conv.respond(text):
