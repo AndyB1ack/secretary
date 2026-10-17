@@ -25,7 +25,7 @@ static std::string join(const std::vector<T> &values, const std::string &delim) 
  * LLama resources: context, model, batch and sampler
  */
 constexpr int   N_THREADS_MIN           = 2;
-constexpr int   N_THREADS_MAX           = 4;
+constexpr int   N_THREADS_MAX           = 6;  // Mira: на S25 6 потоков быстрее 4
 constexpr int   N_THREADS_HEADROOM      = 2;
 
 constexpr int   DEFAULT_CONTEXT_SIZE    = 8192;
@@ -370,6 +370,14 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processSystemPrompt(
     const bool has_chat_template = common_chat_templates_was_explicit(g_chat_templates.get());
     if (has_chat_template) {
         formatted_system_prompt = chat_add_and_format(ROLE_SYSTEM, system_prompt);
+        // Mira: у Gemma нет роли system — шаблон приклеивает её к первому сообщению пользователя,
+        // и тогда весь характер обрабатывается только на первом вопросе (~15 с). Оформляем его
+        // заранее как отдельный ход «пользователь → модель», чтобы он сразу лёг в KV-кэш.
+        if (formatted_system_prompt.find_first_not_of(" \n\t") == std::string::npos) {
+            chat_msgs.clear();
+            formatted_system_prompt = chat_add_and_format(ROLE_USER, system_prompt);
+            formatted_system_prompt += chat_add_and_format(ROLE_ASSISTANT, "Поняла.");
+        }
     }
     env->ReleaseStringUTFChars(jsystem_prompt, system_prompt);
 
