@@ -10,6 +10,8 @@ class Persona:
     data: dict
     mood: str = "ровное"
     mood_reason: str = ""
+    docs_status: str = "база документов пуста — у тебя НЕТ ни одной инструкции, схемы или файла"
+    docs_block: str = ""
     tutor: dict | None = None  # {"language": "he"|"en"} когда слой репетитора включён
     extra: list[str] = field(default_factory=list)
 
@@ -53,7 +55,9 @@ class Persona:
                 f"Включён режим репетитора: говори на {lang}, простыми фразами. Если Андрей ошибся, "
                 "сначала коротко поправь и по-русски объясни, как правильно, потом продолжай разговор."
             )
-        lines.append("Документы: сейчас база документов не подключена — у тебя НЕТ ни одной инструкции, схемы или файла.")
+        lines.append(f"Документы: {self.docs_status}.")
+        if self.docs_block:
+            lines.append(self.docs_block)
         if memory_context:
             lines.append("ПАМЯТЬ (это правда, опирайся на неё; чего здесь нет — того ты не знаешь):")
             lines.append(memory_context)

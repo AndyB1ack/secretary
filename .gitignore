@@ -49,3 +49,4 @@ unity/[Uu]serSettings/
 .DS_Store
 persona/voices/*.wav
 persona/voices/*.mp3
+packs/

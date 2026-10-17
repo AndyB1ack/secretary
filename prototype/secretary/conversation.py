@@ -6,6 +6,7 @@ from . import events as ev
 from .engines.base import LLM
 from .engines.llm_llamacpp import _strip_think
 from .events import EventBus
+from .knowledge import KnowledgeBase, check_citations
 from .memory import Memory
 from .persona import Persona
 from .sentences import SentenceSplitter
@@ -13,7 +14,8 @@ from .sentences import SentenceSplitter
 
 class Conversation:
     def __init__(self, persona: Persona, llm: LLM, bus: EventBus, mode: str = "work",
-                 history_turns: int = 20, memory: Memory | None = None) -> None:
+                 history_turns: int = 20, memory: Memory | None = None,
+                 kb: KnowledgeBase | None = None) -> None:
         self.persona = persona
         self.llm = llm
         self.bus = bus
@@ -22,6 +24,10 @@ class Conversation:
         self.history_turns = history_turns
         self.cancelled = False
         self.memory = memory
+        self.kb = kb
+        self.last_hits = []
+        if kb:
+            persona.docs_status = kb.describe()
         self.greeting = bool(memory and memory.is_first_session_today())
 
     def set_mode(self, mode: str) -> None:
@@ -31,6 +37,11 @@ class Conversation:
     def respond(self, user_text: str) -> Iterator[str]:
         """Отдаёт ответ по предложениям по мере генерации."""
         self.cancelled = False
+        self.last_hits = []
+        self.persona.docs_block = ""
+        if self.kb and not self.kb.empty and self.mode == "work":
+            self.last_hits = self.kb.search(user_text)
+            self.persona.docs_block = KnowledgeBase.prompt_block(self.last_hits)
         ctx = self.memory.context_block(self.mode) if self.memory else ""
         greeting, self.greeting = self.greeting, False
         messages = [{"role": "system", "content": self.persona.system_prompt(self.mode, ctx, greeting)}]
@@ -63,6 +74,7 @@ class Conversation:
             self.memory.add_message(self.mode, "user", user_text)
             self.memory.add_message(self.mode, "assistant", answer)
         self.bus.emit(ev.ASSISTANT_DONE, text=full, first_token_ms=first_token_ms)
+        self.bad_citations = check_citations(full, self.last_hits) if self.kb and not self.kb.empty else []
 
     def cancel(self) -> None:
         self.cancelled = True

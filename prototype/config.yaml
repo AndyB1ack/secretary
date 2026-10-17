@@ -41,4 +41,5 @@ audio:
   barge_in: false            # перебивание; включать только в наушниках, иначе она слышит сама себя
 
 history_turns: 20
+packs_dir: ../packs             # пакеты знаний .kpack (tools/ingest)
 memory_db: data/mira.db       # память Миры; в git не попадает (prototype/data/ в .gitignore)            # сколько последних реплик держать в контексте
