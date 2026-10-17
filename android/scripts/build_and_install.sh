@@ -16,6 +16,15 @@ echo "sdk.dir=$SDK" > local.properties
 [ -d "$ROOT/native/llama.cpp" ] || git clone --depth 1 https://github.com/ggml-org/llama.cpp "$ROOT/native/llama.cpp"
 (cd "$ROOT" && source prototype/.venv/bin/activate 2>/dev/null; python3 tools/export_prompt.py)
 
+SHERPA_VER=1.13.8
+VOICE=vits-piper-ru_RU-irina-medium
+mkdir -p app/libs
+[ -f app/libs/sherpa-onnx.aar ] || { echo "== Скачиваю движок голоса sherpa-onnx $SHERPA_VER (50 МБ)";
+  curl -fL -o app/libs/sherpa-onnx.aar https://github.com/k2-fsa/sherpa-onnx/releases/download/v$SHERPA_VER/sherpa-onnx-$SHERPA_VER.aar; }
+mkdir -p "$ROOT/models/voice"
+[ -d "$ROOT/models/voice/$VOICE" ] || { echo "== Скачиваю голос $VOICE (~65 МБ)";
+  curl -fL https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/$VOICE.tar.bz2 | tar xj -C "$ROOT/models/voice"; }
+
 echo "== Сборка (первый раз 10–20 минут: Gradle скачает всё нужное)"
 ./gradlew --no-daemon -q :app:assembleDebug
 APK=app/build/outputs/apk/debug/app-debug.apk
@@ -33,5 +42,11 @@ if ! "$ADB" shell "[ -f $APPDIR/model.gguf ]"; then
     "$ADB" push "$ROOT/models/$MODEL" $APPDIR/model.gguf
   fi
 fi
+if ! "$ADB" shell "[ -f $APPDIR/voice/tokens.txt ]"; then
+  echo "== Копирую голос на телефон"
+  "$ADB" shell rm -rf $APPDIR/voice
+  "$ADB" push "$ROOT/models/voice/$VOICE" $APPDIR/voice > /dev/null
+fi
+"$ADB" shell am force-stop $PKG
 "$ADB" shell am start -n $PKG/.MainActivity
 echo "✓ Мира запущена на телефоне"

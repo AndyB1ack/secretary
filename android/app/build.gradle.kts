@@ -17,6 +17,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk { abiFilters += listOf("arm64-v8a") }
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -51,6 +52,8 @@ dependencies {
     implementation(libs.material)
 
     implementation(project(":lib"))
+    // Нейроголос: sherpa-onnx (AAR скачивает build_and_install.sh, в git не кладём)
+    implementation(files("libs/sherpa-onnx.aar"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

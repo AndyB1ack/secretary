@@ -27,3 +27,6 @@
     public static int v(...);
     public static int d(...);
 }
+
+# sherpa-onnx: нативный код читает поля конфигов по именам — не трогать
+-keep class com.k2fsa.sherpa.onnx.** { *; }

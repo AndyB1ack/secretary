@@ -35,3 +35,9 @@ embeddings:
   role: эмбеддинги для памяти и базы знаний
   license: MIT
   url: TBD
+
+# Голос Миры на телефоне (офлайн, sherpa-onnx + Piper VITS). Скачивает android/scripts/build_and_install.sh
+voice_android:
+  engine: sherpa-onnx 1.13.8 (https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar)
+  model: vits-piper-ru_RU-irina-medium
+  url: https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-ru_RU-irina-medium.tar.bz2

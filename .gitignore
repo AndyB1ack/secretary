@@ -58,3 +58,4 @@ android/app/build/
 android/lib/build/
 android/lib/.cxx/
 android/build/
+android/app/libs/

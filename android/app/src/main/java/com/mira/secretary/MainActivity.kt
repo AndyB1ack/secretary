@@ -52,6 +52,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val answer = StringBuilder()
 
     private lateinit var tts: TextToSpeech
+
+    @Volatile private var voice: MiraVoice? = null
     private var ttsReady = false
     private val sentenceBuf = StringBuilder()
     private var recognizer: SpeechRecognizer? = null
@@ -71,6 +73,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         inputEt.isEnabled = false
 
         tts = TextToSpeech(this, this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            voice = MiraVoice.load(File(getExternalFilesDir(null), "voice"))
+        }
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.RECORD_AUDIO), 2)
@@ -117,7 +122,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         inputEt.text = null
         inputEt.isEnabled = false
         fab.isEnabled = false
-        tts.stop()
+        tts.stop(); voice?.stop()
         sentenceBuf.clear()
         messages.add(Message(UUID.randomUUID().toString(), text, true))
         answer.clear()
@@ -154,13 +159,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     /** Озвучиваем по предложениям, пока ответ дописывается. Еврейские буквы голос пропускает — их видно на экране. */
     private fun flushSpeech(force: Boolean) {
-        if (!ttsReady) return
+        if (!ttsReady && voice == null) return
         val text = sentenceBuf.toString()
         val cut = if (force) text.length else text.indexOfLast { it == '.' || it == '!' || it == '?' || it == '…' } + 1
         if (cut <= 0) return
         val sentence = text.substring(0, cut).replace(HEBREW, "").replace(Regex("[()]"), "").trim()
         sentenceBuf.delete(0, cut)
-        if (sentence.length > 1) tts.speak(sentence, TextToSpeech.QUEUE_ADD, null, UUID.randomUUID().toString())
+        if (sentence.length <= 1) return
+        val v = voice
+        if (v != null) v.say(sentence) else tts.speak(sentence, TextToSpeech.QUEUE_ADD, null, UUID.randomUUID().toString())
     }
 
     private fun listen() {
@@ -172,7 +179,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             Toast.makeText(this, "Распознавание речи недоступно на этом телефоне", Toast.LENGTH_LONG).show()
             return
         }
-        tts.stop()
+        tts.stop(); voice?.stop()
         recognizer?.destroy()
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(object : RecognitionListener {
@@ -216,6 +223,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         stopService(Intent(this, MiraService::class.java))
         recognizer?.destroy()
         tts.shutdown()
+        voice?.release()
         if (::engine.isInitialized) engine.destroy()
         super.onDestroy()
     }
