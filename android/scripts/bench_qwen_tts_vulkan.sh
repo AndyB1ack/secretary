@@ -25,6 +25,12 @@ VK=native/vulkan
 
 echo "== Заголовки Vulkan"
 [ -d $VK/Vulkan-Headers ] || git clone -q --depth 1 https://github.com/KhronosGroup/Vulkan-Headers $VK/Vulkan-Headers
+if [ ! -f $VK/spirv/share/cmake/SPIRV-Headers/SPIRV-HeadersConfig.cmake ]; then
+  [ -d $VK/SPIRV-Headers ] || git clone -q --depth 1 https://github.com/KhronosGroup/SPIRV-Headers $VK/SPIRV-Headers
+  "$CMAKE" -S $VK/SPIRV-Headers -B $VK/SPIRV-Headers/build -G Ninja -DCMAKE_MAKE_PROGRAM="$NINJA" \
+    -DSPIRV_HEADERS_ENABLE_TESTS=OFF -DSPIRV_HEADERS_ENABLE_INSTALL=ON > /dev/null
+  "$CMAKE" --install $VK/SPIRV-Headers/build --prefix "$(pwd)/$VK/spirv" > /dev/null
+fi
 
 echo "== Сборка голоса с Vulkan (5–15 минут: компилируются шейдеры)"
 "$CMAKE" -S $SRC -B native/build-qtts-vulkan -G Ninja -DCMAKE_MAKE_PROGRAM="$NINJA" \
@@ -32,6 +38,7 @@ echo "== Сборка голоса с Vulkan (5–15 минут: компили�
   -DCMAKE_C_FLAGS="-march=armv8.7-a" -DCMAKE_CXX_FLAGS="-march=armv8.7-a" \
   -DGGML_VULKAN=ON -DVulkan_INCLUDE_DIR="$(pwd)/$VK/Vulkan-Headers/include" -DVulkan_LIBRARY="$VKLIB" \
   -DVulkan_GLSLC_EXECUTABLE="$GLSLC" \
+  -DSPIRV-Headers_DIR="$(pwd)/$VK/spirv/share/cmake/SPIRV-Headers" \
   -DGGML_OPENMP=OFF -DGGML_LLAMAFILE=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release > native/vulkan_cmake.log 2>&1 \
   || { tail -30 native/vulkan_cmake.log; exit 1; }
 "$CMAKE" --build native/build-qtts-vulkan -j 8 > native/vulkan_build.log 2>&1 || { grep -E "error|Error" native/vulkan_build.log | head -20; exit 1; }
