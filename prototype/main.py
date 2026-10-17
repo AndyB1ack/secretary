@@ -197,9 +197,19 @@ def memory_command(conv: Conversation, text: str) -> None:
 
 
 HEBREW = __import__("re").compile(r"[\u0590-\u05FF]+")
-VOICE_HE_RULE = ("Голосовой режим: твой голос читает только кириллицу. Каждую фразу на иврите пиши так: "
-                 "сначала иврит с огласовками, затем в скобках русская транслитерация с ударением — "
-                 "вслух прозвучит транслитерация, иврит Андрей увидит на экране.")
+VOICE_HE_RULE = ("Голосовой режим: твой голос читает только русские буквы. Каждую фразу на иврите пиши так: "
+                 "сначала иврит с огласовками, затем в скобках транслитерация РУССКИМИ буквами (не латиницей!), "
+                 "например: שָׁלוֹם (шалом). Вслух прозвучит транслитерация, иврит Андрей увидит на экране.")
+LATIN = __import__("re").compile(r"[A-Za-z]")
+
+
+def speakable(text: str) -> str:
+    """Оставляет то, что русский голос может прочитать: без еврейских букв и латиницы."""
+    t = HEBREW.sub("", text)
+    t = __import__("re").sub(r"\([^()]*[A-Za-z][^()]*\)", "", t)  # скобки с латиницей целиком
+    t = LATIN.sub("", t)
+    t = __import__("re").sub(r"\s+", " ", t).strip(" ()—-,.!?:;")
+    return t if __import__("re").search(r"[А-Яа-яЁё0-9]", t) else ""
 
 
 def set_practice(conv: Conversation, practice: str, stt=None) -> None:
@@ -237,10 +247,14 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
 
     def tts_worker() -> None:
         while True:
-            sentence = HEBREW.sub("", tts_q.get()).strip(" ()—-")  # еврейские буквы голос не читает — их видно на экране
+            sentence = speakable(tts_q.get())
             if not sentence:
                 continue
-            audio = tts.synthesize(sentence)
+            try:
+                audio = tts.synthesize(sentence)
+            except Exception as exc:  # голос не смог прочитать фразу — пропускаем её, но не падаем
+                print(f"   [голос пропустил фразу: {exc.__class__.__name__}]")
+                continue
             if conv.cancelled:
                 continue
             speaker.enqueue(audio)
