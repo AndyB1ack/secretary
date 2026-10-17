@@ -63,3 +63,108 @@ class Tutor:
                             (interval, (date.today() + timedelta(days=interval)).isoformat(), he))
         self.db.commit()
         return used
+
+
+# --- практика: разговор, сценки, уроки, словарь -----------------------------
+
+TUTOR_MODES = {
+    "talk": ("Свободный разговор на иврите на бытовую или рабочую тему. Говори короткими простыми фразами, "
+             "в основном словами, которые Андрей уже знает (список ниже), и понемногу добавляй новые."),
+    "scene": ("Сценка: разыгрываете ситуацию по ролям. Ты играешь одну или несколько ролей (мужчину, женщину, "
+              "группу людей) — перед репликой пиши роль в скобках, например (врач, муж.): … Соблюдай род и число "
+              "в глаголах и прилагательных. Андрей играет свою роль. Ошибки поправляй после его реплики."),
+    "lesson": ("Урок: объясни материал по-русски, коротко и с примерами на иврите, потом задай 2–3 вопроса "
+               "на проверку и разбери ответы."),
+    "quiz": ("Опрос: по очереди спрашивай пройденные слова и фразы (с русского на иврит и обратно), "
+             "по одному за раз; хвали за правильные, разбирай ошибки."),
+}
+
+
+def _course_index(course: dict) -> dict[str, list[dict]]:
+    idx: dict[str, list[dict]] = {}
+    for t in course.get("terms", []):
+        idx.setdefault(plain(t["he"]), []).append(t)
+    return idx
+
+
+class Practice:
+    """Надстройка над Tutor: режимы практики, известный лексикон, новые слова, сценки, уроки, словарь."""
+
+    def __init__(self, tutor: Tutor) -> None:
+        self.t = tutor
+        self.mode = "talk"
+        self.topic = ""
+        self.scene: dict | None = None
+        self.lesson: dict | None = None
+        self.lookups: list[dict] = []
+        self._idx = _course_index(tutor.course)
+
+    def known(self, n: int = 40) -> list[dict]:
+        rows = self.t.db.execute("SELECT he, nikud, tr, ru FROM tutor_cards WHERE reps > 0 "
+                                 "ORDER BY reps DESC, random() LIMIT ?", (n,)).fetchall()
+        return [dict(zip(("he", "nikud", "tr", "ru"), r)) for r in rows]
+
+    def set_scene(self, query: str = "") -> str:
+        scenes = self.t.course.get("scenarios", [])
+        q = query.lower()
+        match = next((s for s in scenes if q and (q in s.get("id", "").lower() or q in s.get("title_ru", "").lower())), None)
+        self.mode, self.scene, self.topic = "scene", match, ("" if match else query)
+        return match["title_ru"] if match else (query or "свободная сценка")
+
+    def set_lesson(self, lesson_id: str) -> str | None:
+        self.lesson = next((l for l in self.t.course.get("lessons", []) if l["id"].lower() == lesson_id.lower()), None)
+        if self.lesson:
+            self.mode = "lesson"
+            return self.lesson["title"]
+        return None
+
+    def lookup(self, word: str) -> list[dict]:
+        w = plain(word.strip())
+        hits = self._idx.get(w, [])
+        if not hits:
+            low = word.lower().strip()
+            hits = [t for t in self.t.course.get("terms", []) if low and low in t["ru"].lower()][:5]
+        self.lookups = hits[:5]
+        return self.lookups
+
+    def sync_from_app(self, url: str, token: str) -> int:
+        """Подтягивает пройденное из Ivrit Trainer (GET /api/mira/progress). Нужна сеть."""
+        import urllib.request
+
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+        data = json.load(urllib.request.urlopen(req, timeout=20))
+        for t in data.get("terms", []):
+            self.t.db.execute("""INSERT INTO tutor_cards (he, ru, tr, nikud, track, due, interval, reps, seen)
+                                 VALUES (?,?,?,?,?,?,?,?,?)
+                                 ON CONFLICT(he) DO UPDATE SET reps=max(reps, excluded.reps)""",
+                              (t["he"], t["ru"], t.get("tr", ""), t.get("nikud", ""), "APP",
+                               (t.get("due") or date.today().isoformat())[:10], int(t.get("stability") or 1),
+                               int(t.get("reps") or 1), date.today().isoformat()))
+        self.t.db.commit()
+        return len(data.get("terms", []))
+
+    def prompt_block(self) -> str:
+        lines = [f"Режим практики: {TUTOR_MODES[self.mode]}"]
+        known = self.known()
+        if known:
+            lines.append("Андрей уже знает: " + "; ".join(f"{k['nikud'] or k['he']} — {k['ru']}" for k in known) + ".")
+        else:
+            lines.append("Пройденных слов пока мало — начинай с самых простых фраз.")
+        new = self.t.today or self.t.pick()
+        lines.append("Новые слова на сегодня (вводи по одному, объясняй, проси повторить): " +
+                     "; ".join(f"{c['nikud'] or c['he']} ({c['tr']}) — {c['ru']}" for c in new) + ".")
+        if self.mode == "scene" and self.scene:
+            script = " / ".join(f"{l.get('speaker')}: {l.get('he')}" for l in self.scene.get("lines", [])[:12])
+            lines.append(f"Сценка «{self.scene.get('title_ru')}». Цель: {self.scene.get('goal_ru', '')}. "
+                         f"Образец реплик (используй как опору, не читай подряд): {script}")
+        elif self.mode == "scene" and self.topic:
+            lines.append(f"Тема сценки: {self.topic}. Придумай ситуацию и роли сама.")
+        if self.mode == "lesson" and self.lesson:
+            lines.append(f"Урок {self.lesson['id']} «{self.lesson['title']}». Цель: {self.lesson['goal']}. "
+                         f"Материал:\n{self.lesson['grammar'][:2500]}")
+        if self.lookups:
+            lines.append("Словарь (точные данные из курса, опирайся на них — огласовки, ударение, перевод): " +
+                         "; ".join(f"{t['nikud']} ({t['tr']}) — {t['ru']}" for t in self.lookups))
+        lines.append("Иврит всегда с огласовками и русской транслитерацией с ударением. Если слова нет в словаре "
+                     "и ты не уверена в огласовке или ударении — так и скажи, не выдумывай.")
+        return "\n".join(lines)

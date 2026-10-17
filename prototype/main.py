@@ -74,7 +74,8 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
         speaker = Speaker(tts.sample_rate)
     switcher = ModeSwitcher()
     print(f"\n{conv.persona.name} на связи (режим {conv.mode}). Команды: /mode <режим>, /tutor he|en|off, "
-          "/tasks, /done N, /remember факт, /forget слово, /memory, /quit\n")
+          "/tasks, /done N, /remember, /forget, /memory, /quit\n"
+          "Иврит: /talk, /scene [тема или id], /scenes, /lesson ID, /quiz, /word слово, /sync\n")
     while True:
         try:
             text = input("Ты: ").strip()
@@ -86,7 +87,8 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
             break
         if text.startswith("/mode "):
             conv.set_mode(text.split(maxsplit=1)[1]); print(f"[режим: {conv.mode}]"); continue
-        if text in ("/tasks", "/memory", "/mood") or text.split()[0] in ("/done", "/remember", "/forget", "/task"):
+        if text in ("/tasks", "/memory", "/mood", "/talk", "/quiz", "/sync", "/scenes") or \
+                text.split()[0] in ("/done", "/remember", "/forget", "/task", "/scene", "/lesson", "/word"):
             memory_command(conv, text); continue
         if text.startswith("/tutor"):
             arg = text.split()[-1]
@@ -121,6 +123,31 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
 def memory_command(conv: Conversation, text: str) -> None:
     m = conv.memory
     cmd, _, arg = text.partition(" ")
+    pr = conv.practice
+    if cmd == "/scene":
+        conv.persona.tutor = {"language": "he"}
+        print(f"  [сценка: {pr.set_scene(arg)}] — начинай или скажи «начинай»"); return
+    if cmd == "/lesson":
+        title = pr.set_lesson(arg)
+        conv.persona.tutor = {"language": "he"}
+        print(f"  [урок: {title}]" if title else "  нет такого урока (пример: /lesson L01)"); return
+    if cmd == "/talk":
+        pr.mode = "talk"; conv.persona.tutor = {"language": "he"}; print("  [разговор на иврите]"); return
+    if cmd == "/quiz":
+        pr.mode = "quiz"; conv.persona.tutor = {"language": "he"}; print("  [опрос по пройденному]"); return
+    if cmd == "/word" and arg:
+        hits = pr.lookup(arg)
+        print("\n".join(f"  {t['nikud']} ({t['tr']}) — {t['ru']}  [{t['src']}]" for t in hits) or "  в курсе нет"); return
+    if cmd == "/sync":
+        import os
+        url, tok = os.environ.get("IVRIT_URL"), os.environ.get("IVRIT_TOKEN")
+        if not (url and tok):
+            print("  задай IVRIT_URL (…/api/mira/progress) и IVRIT_TOKEN"); return
+        print(f"  ✓ подтянуто слов из приложения: {pr.sync_from_app(url, tok)}"); return
+    if cmd == "/scenes":
+        for s in conv.tutor.course.get("scenarios", []):
+            print(f"  {s.get('id')}: {s.get('title_ru')}")
+        return
     if cmd == "/tasks":
         tasks = m.open_tasks()
         print("\n".join(f"  [{t['id']}] {t['title']}" + (f" — до {t['due']}" if t['due'] else "") for t in tasks)

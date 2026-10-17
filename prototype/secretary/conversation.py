@@ -8,7 +8,7 @@ from .engines.llm_llamacpp import _strip_think
 from .events import EventBus
 from .knowledge import KnowledgeBase, check_citations
 from .memory import Memory
-from .tutor import Tutor
+from .tutor import Practice, Tutor
 from .persona import Persona
 from .sentences import SentenceSplitter
 
@@ -27,6 +27,7 @@ class Conversation:
         self.memory = memory
         self.kb = kb
         self.tutor = Tutor(memory.db) if memory else None
+        self.practice = Practice(self.tutor) if self.tutor else None
         self.last_hits = []
         if kb:
             persona.docs_status = kb.describe()
@@ -46,7 +47,8 @@ class Conversation:
             self.persona.docs_block = KnowledgeBase.prompt_block(self.last_hits)
         if self.tutor and self.persona.tutor:
             self.tutor.after_user(user_text)
-            self.persona.tutor_block = self.tutor.prompt_block(self.persona.tutor["language"])
+            lang = self.persona.tutor["language"]
+            self.persona.tutor_block = self.practice.prompt_block() if lang == "he" else ""
         ctx = self.memory.context_block(self.mode) if self.memory else ""
         greeting, self.greeting = self.greeting, False
         messages = [{"role": "system", "content": self.persona.system_prompt(self.mode, ctx, greeting)}]
