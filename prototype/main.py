@@ -20,6 +20,8 @@ from secretary import events as ev
 from secretary.conversation import Conversation
 from secretary.engines import make_llm, make_stt, make_tts, make_vad
 from secretary.events import EventBus
+from secretary.memory import Memory, consolidate
+from secretary.mood import mood_for_today
 from secretary.modes import detect_mode_command
 from secretary.persona import Persona
 
@@ -38,8 +40,26 @@ def build(cfg: dict, mode: str, tutor: str | None) -> tuple[Conversation, EventB
     models_dir = (HERE / cfg["models_dir"]).resolve()
     print(f"Загружаю языковую модель {cfg['llm']['model']}…")
     llm = make_llm(cfg["llm"], models_dir)
+    memory = Memory(HERE / cfg.get("memory_db", "data/mira.db"))
+    pending = memory.unsummarized_sessions()
+    if pending:  # «сон»: дожимаем разговоры, которые не успели сжать
+        print(f"Разбираю память за прошлые разговоры ({len(pending)})…")
+        for s in pending:
+            consolidate(memory, llm, s)
+    persona.mood, persona.mood_reason = mood_for_today(memory)
+    print(f"Настроение Миры сегодня: {persona.mood}")
     bus = EventBus()
-    return Conversation(persona, llm, bus, mode, cfg.get("history_turns", 20)), bus
+    return Conversation(persona, llm, bus, mode, cfg.get("history_turns", 20), memory), bus
+
+
+def finish(conv: Conversation) -> None:
+    """При выходе сжимаем разговор в память."""
+    if conv.memory:
+        print("\nЗапоминаю разговор…")
+        data = consolidate(conv.memory, conv.llm)
+        if data:
+            n_f, n_t = len(data.get("facts") or []), len(data.get("tasks") or [])
+            print(f"✓ {data.get('summary', '')}  [фактов: {n_f}, задач: {n_t}]")
 
 
 def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
@@ -48,7 +68,8 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
         from secretary.audio import Speaker
         tts = make_tts(cfg["tts"], (HERE / cfg["models_dir"]).resolve())
         speaker = Speaker(tts.sample_rate)
-    print(f"\n{conv.persona.name} на связи (режим {conv.mode}). Команды: /mode <режим>, /tutor he|en|off, /quit\n")
+    print(f"\n{conv.persona.name} на связи (режим {conv.mode}). Команды: /mode <режим>, /tutor he|en|off, "
+          "/tasks, /done N, /remember факт, /forget слово, /memory, /quit\n")
     while True:
         try:
             text = input("Ты: ").strip()
@@ -60,6 +81,8 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
             break
         if text.startswith("/mode "):
             conv.set_mode(text.split(maxsplit=1)[1]); print(f"[режим: {conv.mode}]"); continue
+        if text in ("/tasks", "/memory", "/mood") or text.split()[0] in ("/done", "/remember", "/forget", "/task"):
+            memory_command(conv, text); continue
         if text.startswith("/tutor"):
             arg = text.split()[-1]
             conv.persona.tutor = None if arg == "off" else {"language": arg}
@@ -76,6 +99,27 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
                 if first is None:
                     first = time.monotonic() - t0
         print(f"\n   [{_ms(time.monotonic() - t0)} всего" + (f", первый звук {_ms(first)}" if first else "") + "]")
+
+
+def memory_command(conv: Conversation, text: str) -> None:
+    m = conv.memory
+    cmd, _, arg = text.partition(" ")
+    if cmd == "/tasks":
+        tasks = m.open_tasks()
+        print("\n".join(f"  [{t['id']}] {t['title']}" + (f" — до {t['due']}" if t['due'] else "") for t in tasks)
+              or "  Открытых задач нет.")
+    elif cmd == "/task" and arg:
+        print(f"  ✓ задача [{m.add_task(arg)}] {arg}")
+    elif cmd == "/done" and arg.isdigit():
+        print("  ✓ выполнено" if m.complete_task(int(arg)) else "  нет такой открытой задачи")
+    elif cmd == "/remember" and arg:
+        m.add_fact(arg, "private" if conv.mode == "private" else "work"); print("  ✓ запомнила")
+    elif cmd == "/forget" and arg:
+        print(f"  забыто фактов: {m.forget(arg)}")
+    elif cmd == "/memory":
+        print(m.context_block(conv.mode))
+    elif cmd == "/mood":
+        print(f"  {conv.persona.mood} — {conv.persona.mood_reason}")
 
 
 def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
@@ -158,6 +202,7 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
                 threading.Thread(target=handle, args=(audio,), daemon=True).start()
     except KeyboardInterrupt:
         print("\nПока!")
+    finish(conv)
 
 
 def _ms(seconds: float) -> str:
@@ -181,6 +226,7 @@ def main() -> None:
     conv, bus = build(cfg, args.mode, args.tutor)
     if args.text:
         text_loop(conv, cfg, args.speak)
+        finish(conv)
     else:
         voice_loop(conv, bus, cfg)
 

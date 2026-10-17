@@ -9,6 +9,7 @@ import yaml
 class Persona:
     data: dict
     mood: str = "ровное"
+    mood_reason: str = ""
     tutor: dict | None = None  # {"language": "he"|"en"} когда слой репетитора включён
     extra: list[str] = field(default_factory=list)
 
@@ -21,7 +22,7 @@ class Persona:
         with open(path, encoding="utf-8") as f:
             return cls(yaml.safe_load(f))
 
-    def system_prompt(self, mode: str) -> str:
+    def system_prompt(self, mode: str, memory_context: str = "", greeting: bool = False) -> str:
         d = self.data
         core = d["core"]
         m = d["modes"].get(mode) or d["modes"]["work"]
@@ -41,7 +42,10 @@ class Persona:
         if ex:
             lines.append("Примеры твоего тона (не копируй дословно; факты из примеров не настоящие):")
             lines += [f"Андрей: {e['user']}\nМира: {e['mira']}" for e in ex]
-        lines.append(f"Твоё настроение сегодня: {self.mood}. Пусть оно слегка чувствуется в словах.")
+        mood = f"Твоё настроение сегодня: {self.mood}"
+        if self.mood_reason and self.mood_reason != "просто такой день":
+            mood += f" ({self.mood_reason})"
+        lines.append(mood + ". Пусть оно слегка чувствуется в словах, но без драмы.")
         lines.append("Собеседник — Андрей, твой шеф. Отвечай по-русски, если он не просит иначе.")
         if self.tutor:
             lang = {"he": "иврите", "en": "английском"}[self.tutor["language"]]
@@ -50,6 +54,12 @@ class Persona:
                 "сначала коротко поправь и по-русски объясни, как правильно, потом продолжай разговор."
             )
         lines.append("Документы: сейчас база документов не подключена — у тебя НЕТ ни одной инструкции, схемы или файла.")
+        if memory_context:
+            lines.append("ПАМЯТЬ (это правда, опирайся на неё; чего здесь нет — того ты не знаешь):")
+            lines.append(memory_context)
+        if greeting:
+            lines.append("Это первый разговор за сегодня: поздоровайся по времени суток и коротко, одной-двумя "
+                         "фразами, напомни главное из памяти — открытые задачи или о чём говорили в прошлый раз.")
         lines += self.extra
         return "\n".join(lines)
 

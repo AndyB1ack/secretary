@@ -6,13 +6,14 @@ from . import events as ev
 from .engines.base import LLM
 from .engines.llm_llamacpp import _strip_think
 from .events import EventBus
+from .memory import Memory
 from .persona import Persona
 from .sentences import SentenceSplitter
 
 
 class Conversation:
     def __init__(self, persona: Persona, llm: LLM, bus: EventBus, mode: str = "work",
-                 history_turns: int = 20) -> None:
+                 history_turns: int = 20, memory: Memory | None = None) -> None:
         self.persona = persona
         self.llm = llm
         self.bus = bus
@@ -20,6 +21,8 @@ class Conversation:
         self.history: list[dict] = []
         self.history_turns = history_turns
         self.cancelled = False
+        self.memory = memory
+        self.greeting = bool(memory and memory.is_first_session_today())
 
     def set_mode(self, mode: str) -> None:
         self.mode = mode
@@ -28,7 +31,9 @@ class Conversation:
     def respond(self, user_text: str) -> Iterator[str]:
         """Отдаёт ответ по предложениям по мере генерации."""
         self.cancelled = False
-        messages = [{"role": "system", "content": self.persona.system_prompt(self.mode)}]
+        ctx = self.memory.context_block(self.mode) if self.memory else ""
+        greeting, self.greeting = self.greeting, False
+        messages = [{"role": "system", "content": self.persona.system_prompt(self.mode, ctx, greeting)}]
         messages += self.history[-self.history_turns * 2:]
         messages.append({"role": "user", "content": user_text})
 
@@ -51,8 +56,12 @@ class Conversation:
                 self.bus.emit(ev.ASSISTANT_SENTENCE, text=sentence)
                 yield sentence
 
+        answer = full.strip() + (" …" if self.cancelled else "")
         self.history.append({"role": "user", "content": user_text})
-        self.history.append({"role": "assistant", "content": full.strip() + (" …" if self.cancelled else "")})
+        self.history.append({"role": "assistant", "content": answer})
+        if self.memory:
+            self.memory.add_message(self.mode, "user", user_text)
+            self.memory.add_message(self.mode, "assistant", answer)
         self.bus.emit(ev.ASSISTANT_DONE, text=full, first_token_ms=first_token_ms)
 
     def cancel(self) -> None:
