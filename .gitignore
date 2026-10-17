@@ -1,0 +1,49 @@
+# Модели и большие файлы — скачиваются скриптом по models.yaml
+models/
+*.gguf
+*.bin
+*.onnx
+*.pt
+*.safetensors
+*.kpack
+
+# Секреты
+.env
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Данные прототипа (память, база)
+prototype/data/
+
+# Android / Gradle
+android/.gradle/
+android/build/
+android/**/build/
+android/local.properties
+android/.idea/
+*.apk
+*.aab
+
+# Native
+native/build/
+
+# Unity
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Ll]ogs/
+unity/[Uu]serSettings/
+*.csproj
+*.sln
+
+# macOS
+.DS_Store

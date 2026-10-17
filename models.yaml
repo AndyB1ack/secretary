@@ -1,0 +1,41 @@
+# Модели проекта. Сами файлы в репозиторий не кладутся — их скачивает скрипт.
+# Ссылки и контрольные суммы заполняются, когда модель выбрана на этапе 2.
+# Всё в этом списке бесплатно и работает без сети.
+
+llm_work:
+  name: Qwen3-4B (Q4_K_M, GGUF)
+  role: языковая модель, рабочий режим
+  license: Apache-2.0
+  url: TBD
+  sha256: TBD
+
+llm_private:
+  name: TBD (uncensored-версия Qwen3 4B или Gemma 3 4B, GGUF)
+  role: языковая модель, приватный режим
+  url: TBD
+  sha256: TBD
+
+stt:
+  name: whisper small (ggml)
+  role: распознавание речи
+  license: MIT
+  url: TBD
+  sha256: TBD
+
+vad:
+  name: Silero VAD
+  role: детектор речи
+  license: MIT
+  url: TBD
+
+tts:
+  name: Silero TTS (ru), запасной — Piper (ru)
+  role: синтез речи
+  license: Silero — некоммерческая (личный проект), Piper — MIT
+  url: TBD
+
+embeddings:
+  name: multilingual-e5-small
+  role: эмбеддинги для памяти и базы знаний
+  license: MIT
+  url: TBD
