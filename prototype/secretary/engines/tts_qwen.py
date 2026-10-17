@@ -26,6 +26,10 @@ class QwenTTS:
         except Exception:
             self.model = Qwen3TTSModel.from_pretrained(self.model_id, device_map="cpu", dtype=torch.float32,
                                                        attn_implementation="sdpa")
+        # осторожная выборка: при высокой «температуре» модель бормочет лишние слова
+        self.gen = dict(temperature=cfg.get("temperature", 0.6), top_p=cfg.get("top_p", 0.85), top_k=30,
+                        repetition_penalty=1.1, subtalker_temperature=cfg.get("temperature", 0.6),
+                        subtalker_top_p=cfg.get("top_p", 0.85))
         self.sample_rate = 24000
         self.synthesize("Привет.")  # прогрев, заодно узнаём частоту
 
@@ -33,11 +37,13 @@ class QwenTTS:
         tone = EMOTIONS.get(emotion or DEFAULT, EMOTIONS[DEFAULT])
         if self.style:
             tone = f"{self.style}; {tone}"
+        # предел длины звука по длине текста (~12 кадров/с), чтобы не договаривала «от себя» после фразы
+        gen = dict(self.gen, max_new_tokens=int(len(text) * 1.3) + 24)
         if self.design:
             wavs, sr = self.model.generate_voice_design(text=text, language="Russian",
-                                                        instruct=f"{self.voice}. Emotion: {tone}.")
+                                                        instruct=f"{self.voice}. Emotion: {tone}.", **gen)
         else:
             wavs, sr = self.model.generate_custom_voice(text=text, language="Russian", speaker=self.speaker,
-                                                        instruct=tone)
+                                                        instruct=tone, **gen)
         self.sample_rate = sr
         return np.asarray(wavs[0], dtype=np.float32)

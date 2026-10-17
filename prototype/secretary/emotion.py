@@ -2,26 +2,26 @@
 import re
 
 # метка (по-русски, так модели проще) → инструкция для Qwen3-TTS
-EMOTIONS = {
-    "спокойно": "calm, warm, friendly",
-    "радостно": "happy, cheerful, smiling",
-    "весело": "playful, laughing a little, joking",
-    "нежно": "tender, soft, affectionate",
-    "грустно": "sad, quiet, a little down",
-    "обиженно": "offended, pouting, sulky",
-    "удивлённо": "surprised, amazed",
-    "строго": "serious, firm, businesslike",
-    "устало": "tired, slow, sighing",
-    "шёпотом": "whispering, intimate, very soft",
-    "игриво": "flirty, playful, teasing",
+EMOTIONS = {   # мягкие формулировки: Qwen легко переигрывает
+    "спокойно": "natural relaxed conversational tone, not exaggerated",
+    "радостно": "slightly happy, warm smile in the voice",
+    "весело": "light playful tone, a hint of laughter",
+    "нежно": "soft and tender, gentle",
+    "грустно": "a little sad, quieter",
+    "обиженно": "slightly offended, a bit sulky",
+    "удивлённо": "mildly surprised",
+    "строго": "calm and businesslike, firm",
+    "устало": "a little tired, slower",
+    "шёпотом": "whispering softly",
+    "игриво": "playful, a little flirty",
 }
 DEFAULT = "спокойно"
 MOOD_TO_EMOTION = {"отличное": "радостно", "ровное": "спокойно", "задумчивое": "спокойно",
                    "грустное": "грустно", "немного обиженное": "обиженно"}
 
-PROMPT = ("Голос: твой ответ озвучивается живым голосом с эмоциями. В начале ответа (и там, где тон меняется) "
-          "ставь метку тона в квадратных скобках, одну из: " + ", ".join(f"[{k}]" for k in EMOTIONS) +
-          ". Метку не произносят и не объясняют. Пример: «[весело] Ну ты даёшь! [нежно] Я рада, что ты пришёл.»")
+PROMPT = ("Голос: твой ответ озвучивается живым голосом. Обычная речь — без меток. Только когда эмоция правда заметна, "
+          "поставь перед фразой метку тона в квадратных скобках, одну из: " + ", ".join(f"[{k}]" for k in EMOTIONS) +
+          ". Не больше одной метки на ответ, не переигрывай. Метку не произносят. Пример: «[весело] Ну ты даёшь!»")
 
 _TAG = re.compile(r"\[\s*([а-яё]+)\s*\]", re.IGNORECASE)
 

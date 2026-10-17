@@ -34,7 +34,8 @@ tts:
   qwen:                      # --voice qwen: живой голос с эмоциями (pip install -U qwen-tts)
     model: Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice   # или Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign
     speaker: Serena
-    style: young woman, lively, natural conversational Russian
+    style: young woman, natural conversational Russian
+    temperature: 0.6           # выше — живее, но может бормотать; ниже — ровнее
     voice_description: A young woman about 25, warm and lively, clear soft voice   # только для VoiceDesign
   f5:
     ref_audio: ../persona/voices/mira_ref.wav   # образец голоса 10–20 с
