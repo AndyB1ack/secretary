@@ -64,3 +64,6 @@ native/qwentts.cpp/
 native/build-qtts-android/
 native/opencl/
 native/build-qtts-opencl/
+native/vulkan/
+native/build-qtts-vulkan/
+native/*.log
