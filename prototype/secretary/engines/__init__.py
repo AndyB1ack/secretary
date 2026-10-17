@@ -2,11 +2,10 @@
 from .base import LLM, STT, TTS, VAD
 
 
-def make_llm(cfg: dict, models_dir, model_key: str = "work_model") -> LLM:
+def make_llm(cfg: dict, models_dir) -> LLM:
     if cfg["engine"] == "llamacpp":
         from .llm_llamacpp import LlamaCppLLM
-        name = cfg.get(model_key) or cfg["work_model"]
-        return LlamaCppLLM(models_dir / name, cfg)
+        return LlamaCppLLM(models_dir / cfg["model"], cfg)
     raise ValueError(f"неизвестный движок LLM: {cfg['engine']}")
 
 

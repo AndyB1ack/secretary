@@ -36,9 +36,8 @@ def build(cfg: dict, mode: str, tutor: str | None) -> tuple[Conversation, EventB
     if tutor:
         persona.tutor = {"language": tutor}
     models_dir = (HERE / cfg["models_dir"]).resolve()
-    key = "private_model" if mode == "private" else "work_model"
     print("Загружаю языковую модель…")
-    llm = make_llm(cfg["llm"], models_dir, key)
+    llm = make_llm(cfg["llm"], models_dir)
     bus = EventBus()
     return Conversation(persona, llm, bus, mode, cfg.get("history_turns", 20)), bus
 

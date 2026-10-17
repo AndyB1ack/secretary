@@ -2,16 +2,10 @@
 # Ссылки и контрольные суммы заполняются, когда модель выбрана на этапе 2.
 # Всё в этом списке бесплатно и работает без сети.
 
-llm_work:
-  name: Qwen3-4B (Q4_K_M, GGUF)
-  role: языковая модель, рабочий режим
-  license: Apache-2.0
-  url: TBD
-  sha256: TBD
-
-llm_private:
-  name: TBD (uncensored-версия Qwen3 4B или Gemma 3 4B, GGUF)
-  role: языковая модель, приватный режим
+llm:
+  name: TBD — одна модель без цензуры на все режимы (ADR 0007)
+  candidates: [abliterated Qwen3 4B, abliterated Qwen3 8B, abliterated Gemma 3 4B]
+  role: языковая модель, все режимы
   url: TBD
   sha256: TBD
 
