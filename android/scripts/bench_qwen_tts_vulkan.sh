@@ -48,15 +48,20 @@ BIN=$(find native/build-qtts-vulkan -type f -name qwen-tts -perm -u+x | head -1)
 "$ADB" push "$BIN" $DEV/qwen-tts-vk > /dev/null && "$ADB" shell chmod +x $DEV/qwen-tts-vk
 
 CODEC=$("$ADB" shell "ls $DEV" | tr -d '\r' | grep -i tokenizer | head -1)
+TALKER=$("$ADB" shell "ls $DEV" | tr -d '\r' | grep -i talker | grep Q8_0 | head -1)   # Q4_K драйвер Adreno не собирает
 mkdir -p voice_samples
-for TALKER in $("$ADB" shell "ls $DEV" | tr -d '\r' | grep -i talker); do
-  Q=$(echo $TALKER | grep -o 'Q[0-9]_[A-Z0-9_]*' | head -1)
-  echo "== Vulkan, $TALKER"
-  "$ADB" shell "cd $DEV && ./qwen-tts-vk --model $TALKER --codec $CODEC --speaker serena --lang Russian \
-     --instruct 'slightly happy, warm smile in the voice' -o out_vk_$Q.wav < prompt.txt; echo EXIT=\$?" \
-     > voice_samples/vk_log_$Q.txt 2>&1 || true
-  grep -E "\[Perf\]|\[Load\]|ggml_vulkan: [0-9]|EXIT|FATAL|not implemented|abort" voice_samples/vk_log_$Q.txt || true
-  "$ADB" pull $DEV/out_vk_$Q.wav voice_samples/phone_qwen_vk_$Q.wav > /dev/null 2>&1 || true
-done
+# Без настроек модель на Adreno «не слышит» конец фразы и говорит бесконечно — пробуем защитные режимы.
+# --max-new 160: не дольше ~13 с звука, чтобы ничего не висело.
+run() {  # имя, переменные окружения, доп. флаги
+  echo "== Vulkan, $1"
+  "$ADB" shell "cd $DEV && $2 ./qwen-tts-vk --model $TALKER --codec $CODEC --speaker serena --lang Russian \
+     --instruct 'slightly happy, warm smile in the voice' --max-new 160 $3 -o out_vk_$1.wav < prompt.txt; echo EXIT=\$?" \
+     > voice_samples/vk_log_$1.txt 2>&1 || true
+  grep -E "\[Perf\] (Prefill|TalkerDecode|CodePredictor|CodecDecode|Total)|EXIT|FATAL|ERROR" voice_samples/vk_log_$1.txt || true
+  "$ADB" pull $DEV/out_vk_$1.wav voice_samples/phone_qwen_vk_$1.wav > /dev/null 2>&1 || true
+}
+run clamp "" "--clamp-fp16"
+run clamp_nofa "" "--clamp-fp16 --no-fa"
+run nof16 "GGML_VK_DISABLE_F16=1" "--clamp-fp16 --no-fa"
 echo
-echo "Журналы: voice_samples/vk_log_*.txt — я их прочитаю сам."
+echo "Журналы: voice_samples/vk_log_*.txt — я их прочитаю сам. Если звук ~7 с и есть RTF — режим рабочий."
