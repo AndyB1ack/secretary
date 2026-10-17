@@ -109,11 +109,16 @@ def qwen() -> None:
     dev = "mps" if torch.backends.mps.is_available() else "cpu"
     for model_id, kind in (("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", "design"),
                            ("Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice", "custom")):
-        try:
-            print(f"  загружаю {model_id} на {dev} (первый раз долго — скачивание)")
-            m = Qwen3TTSModel.from_pretrained(model_id, device_map=dev, dtype=torch.float32, attn_implementation="sdpa")
-        except Exception as e:
-            print("  ✗", e); continue
+        m = None
+        for d in ([dev, "cpu"] if dev != "cpu" else ["cpu"]):
+            try:
+                print(f"  загружаю {model_id} на {d} (первый раз долго — скачивание)")
+                m = Qwen3TTSModel.from_pretrained(model_id, device_map=d, dtype=torch.float32, attn_implementation="sdpa")
+                break
+            except Exception as e:
+                print(f"  ✗ на {d}: {e}")
+        if m is None:
+            continue
         for name, (text, emo) in QWEN_EMOTIONS.items():
             try:
                 t = time.time()
