@@ -17,7 +17,10 @@ import java.util.concurrent.atomic.AtomicInteger
  * Синтез следующей фразы идёт, пока звучит предыдущая.
  * Модель лежит в files/voice/ (кладёт build_and_install.sh), если её нет — Мира говорит системным голосом.
  */
-class MiraVoice private constructor(private val tts: OfflineTts) {
+class MiraVoice private constructor(private val tts: OfflineTts, private val pitch: Float) {
+    // Высота без обработки звука: синтезируем медленнее в pitch раз и проигрываем быстрее в pitch раз —
+    // темп остаётся прежним, голос выше и моложе.
+    private val rate = (tts.sampleRate() * pitch).toInt()
     private val synth = Executors.newSingleThreadExecutor()
     private val player = Executors.newSingleThreadExecutor()
     private val epoch = AtomicInteger(0)
@@ -27,10 +30,10 @@ class MiraVoice private constructor(private val tts: OfflineTts) {
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
         .setAudioFormat(AudioFormat.Builder()
             .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
-            .setSampleRate(tts.sampleRate())
+            .setSampleRate(rate)
             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
         .setTransferMode(AudioTrack.MODE_STREAM)
-        .setBufferSizeInBytes(AudioTrack.getMinBufferSize(tts.sampleRate(),
+        .setBufferSizeInBytes(AudioTrack.getMinBufferSize(rate,
             AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_FLOAT) * 4)
         .build().apply { play() }
 
@@ -39,8 +42,8 @@ class MiraVoice private constructor(private val tts: OfflineTts) {
         synth.execute {
             if (my != epoch.get()) return@execute
             val t0 = System.currentTimeMillis()
-            val audio = tts.generate(text, 0, SPEED)
-            Log.i(TAG, "TIMING voice=${System.currentTimeMillis() - t0}ms audio=${audio.samples.size * 1000 / audio.sampleRate}ms")
+            val audio = tts.generate(text, 0, SPEED / pitch)
+            Log.i(TAG, "TIMING voice=${System.currentTimeMillis() - t0}ms audio=${audio.samples.size * 1000 / rate}ms pitch=$pitch")
             player.execute {
                 if (my != epoch.get()) return@execute
                 var off = 0
@@ -71,7 +74,7 @@ class MiraVoice private constructor(private val tts: OfflineTts) {
         private const val SPEED = 1.0f
 
         /** Ищет в папке модель Piper (*.onnx + tokens.txt + espeak-ng-data). */
-        fun load(dir: File): MiraVoice? {
+        fun load(dir: File, pitch: Float = 1.0f): MiraVoice? {
             val onnx = dir.listFiles { f -> f.name.endsWith(".onnx") }?.firstOrNull() ?: return null
             return try {
                 val t0 = System.currentTimeMillis()
@@ -85,7 +88,7 @@ class MiraVoice private constructor(private val tts: OfflineTts) {
                         numThreads = 2,
                     ),
                 )
-                MiraVoice(OfflineTts(config = cfg)).also {
+                MiraVoice(OfflineTts(config = cfg), pitch.coerceIn(0.8f, 1.3f)).also {
                     Log.i(TAG, "TIMING voice_load=${System.currentTimeMillis() - t0}ms model=${onnx.name}")
                 }
             } catch (e: Throwable) {

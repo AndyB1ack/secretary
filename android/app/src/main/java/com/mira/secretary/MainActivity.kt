@@ -74,7 +74,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         tts = TextToSpeech(this, this)
         lifecycleScope.launch(Dispatchers.IO) {
-            voice = MiraVoice.load(File(getExternalFilesDir(null), "voice"))
+            val pitch = runCatching { assets.open("voice_pitch.txt").bufferedReader().readText().trim().toFloat() }.getOrDefault(1.0f)
+            voice = MiraVoice.load(File(getExternalFilesDir(null), "voice"), pitch)
         }
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

@@ -16,3 +16,6 @@ out = ROOT / "android" / "app" / "src" / "main" / "assets" / "system_prompt.txt"
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(text, encoding="utf-8")
 print(f"✓ {out.relative_to(ROOT)}: {len(text)} символов")
+pitch = p.data["modes"]["work"].get("voice_pitch", 1.0)  # пока на телефоне только рабочий режим
+(out.parent / "voice_pitch.txt").write_text(str(pitch), encoding="utf-8")
+print(f"✓ высота голоса: {pitch}")

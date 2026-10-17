@@ -44,7 +44,9 @@ class Persona:
             lines.append("Твоя жизнь (это твоё, можешь опираться и делиться): " + "; ".join(d["biography"]) + ".")
         sp = d.get("speech") or {}
         if sp:
-            lines.append(f"Обращения: {', '.join(sp.get('address', []))}. Словечки по ситуации: "
+            addr = m.get("address") or sp.get("address", [])
+            rule = f" ({m['address_rule']})" if m.get("address_rule") else ""
+            lines.append(f"Обращения к Андрею: {', '.join(addr)}{rule}. Словечки по ситуации: "
                          f"{', '.join(sp.get('fillers', []))}. Иногда к месту израильское: "
                          f"{', '.join(sp.get('hebrew_words', []))}.")
             reacts = sp.get("reactions") or {}
