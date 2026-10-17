@@ -7,6 +7,8 @@ omegaconf>=2.3             # нужна Silero TTS
 numpy>=1.26
 sounddevice>=0.4           # микрофон и динамик
 pyyaml>=6.0
-huggingface_hub>=0.24      # скачивание моделей
+huggingface_hub>=0.34,<1.0   # <1.0 — из-за qwen-tts (transformers 4.57)
 f5-tts>=1.1                # живой нейросетевой голос (по желанию)
-sentence-transformers>=3.0     # поиск по базе знаний (multilingual-e5)
+sentence-transformers>=5,<6     # поиск по базе знаний (multilingual-e5); 6.x требует transformers 5 — конфликт с qwen-tts
+datasets>=3,<4.2               # нужен sentence-transformers; новее требует huggingface_hub 1.x
+qwen-tts                       # живой голос с эмоциями (--voice qwen)
