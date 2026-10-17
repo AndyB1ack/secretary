@@ -9,6 +9,7 @@ SDK=${ANDROID_HOME:-/opt/homebrew/share/android-commandlinetools}
 NDK=$(ls -d "$SDK"/ndk/* | tail -1)
 CMAKE_DIR=$(ls -d "$SDK"/cmake/* | tail -1)
 CMAKE="$CMAKE_DIR/bin/cmake"; NINJA="$CMAKE_DIR/bin/ninja"
+export PATH="$CMAKE_DIR/bin:$PATH"   # ninja нужен и вспомогательной сборке шейдеров для Мака
 ADB="$SDK/platform-tools/adb"
 TC="$NDK/build/cmake/android.toolchain.cmake"
 HOST=$(ls "$NDK/toolchains/llvm/prebuilt" | head -1)
