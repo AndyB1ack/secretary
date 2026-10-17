@@ -19,6 +19,16 @@ HF=https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF
 echo "== Исходники qwentts.cpp"
 [ -d $SRC ] || git clone --recurse-submodules --depth 1 https://github.com/ServeurpersoCom/qwentts.cpp $SRC
 
+# Число потоков: по умолчанию половина ядер (4 на S25) — добавляем переменную QT_THREADS, чтобы подобрать
+grep -q QT_THREADS $SRC/src/backend.h || python3 - $SRC/src/backend.h <<'PY'
+import sys
+p = sys.argv[1]; s = open(p).read()
+s = s.replace("static int backend_cpu_n_threads(void) {\n",
+              "static int backend_cpu_n_threads(void) {\n    if (const char * e = std::getenv(\"QT_THREADS\")) { int t = std::atoi(e); if (t > 0) return t; }\n", 1)
+if "#include <cstdlib>" not in s: s = "#include <cstdlib>\n" + s
+open(p, "w").write(s)
+PY
+
 echo "== Сборка под Android (несколько минут)"
 "$CMAKE_DIR/bin/cmake" -S $SRC -B native/build-qtts-android -G Ninja \
   -DCMAKE_MAKE_PROGRAM="$CMAKE_DIR/bin/ninja" \
@@ -50,18 +60,12 @@ TEXT="Андрей, по объекту Аргаман всё готово. За
 "$ADB" shell "echo '$TEXT' > $DEV/prompt.txt"
 mkdir -p voice_samples
 
-for TALKER in $(echo $FILES | tr ' ' '\n' | grep -i talker); do
-  Q=$(echo $TALKER | grep -o 'Q[0-9]_[A-Z0-9_]*' | head -1)
-  echo "== $TALKER"
-  T0=$(date +%s)
-  "$ADB" shell "cd $DEV && ./qwen-tts --model $TALKER --codec $CODEC --speaker serena --lang Russian \
-     --instruct 'happy, cheerful, young woman' -o out_$Q.wav < prompt.txt" 2>&1 | tail -3 || true
-  T1=$(date +%s)
-  "$ADB" pull $DEV/out_$Q.wav voice_samples/phone_qwen_$Q.wav > /dev/null 2>&1 || { echo "   нет звука"; continue; }
-  python3 - "voice_samples/phone_qwen_$Q.wav" $((T1 - T0)) <<'PY'
-import sys, wave
-w = wave.open(sys.argv[1]); dur = w.getnframes() / w.getframerate(); took = int(sys.argv[2])
-print(f"   звук {dur:.1f} с, синтез {took} с → RTF {took / dur:.2f} ({'быстрее' if took < dur else 'медленнее'} реального времени)")
-PY
+Q4=$(echo $FILES | tr ' ' '\n' | grep -i talker | grep Q4 | head -1)
+for TH in ${THREADS:-4 6 8}; do
+  echo "== $Q4, потоков: $TH"
+  "$ADB" shell "cd $DEV && QT_THREADS=$TH ./qwen-tts --model $Q4 --codec $CODEC --speaker serena --lang Russian \
+     --instruct 'slightly happy, warm smile in the voice' -o out_t$TH.wav < prompt.txt" 2>&1 | grep -E "\[Perf\]|\[Load\].*threads" || true
+  "$ADB" pull $DEV/out_t$TH.wav voice_samples/phone_qwen_t$TH.wav > /dev/null 2>&1 || true
 done
-open voice_samples 2>/dev/null || true
+echo
+echo "RTF < 1 — телефон говорит быстрее реального времени. Пришли эти строки [Perf]."
