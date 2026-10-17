@@ -62,3 +62,5 @@ android/app/libs/
 voice_samples/
 native/qwentts.cpp/
 native/build-qtts-android/
+native/opencl/
+native/build-qtts-opencl/
