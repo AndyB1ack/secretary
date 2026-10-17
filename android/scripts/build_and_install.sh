@@ -12,6 +12,7 @@ PKG=com.mira.secretary
 APPDIR=/sdcard/Android/data/$PKG/files
 
 echo "sdk.dir=$SDK" > local.properties
+[ -d "$SDK/cmake/3.31.6" ] || { echo "== Ставлю CMake 3.31.6"; yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" "cmake;3.31.6" > /dev/null 2>&1 || yes | sdkmanager "cmake;3.31.6"; }
 [ -d "$ROOT/native/llama.cpp" ] || git clone --depth 1 https://github.com/ggml-org/llama.cpp "$ROOT/native/llama.cpp"
 (cd "$ROOT" && source prototype/.venv/bin/activate 2>/dev/null; python3 tools/export_prompt.py)
 
