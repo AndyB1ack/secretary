@@ -47,3 +47,4 @@ unity/[Uu]serSettings/
 
 # macOS
 .DS_Store
+persona/voices/*.wav

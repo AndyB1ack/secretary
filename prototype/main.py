@@ -46,7 +46,7 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
     speaker = tts = None
     if speak:
         from secretary.audio import Speaker
-        tts = make_tts(cfg["tts"])
+        tts = make_tts(cfg["tts"], (HERE / cfg["models_dir"]).resolve())
         speaker = Speaker(tts.sample_rate)
     print(f"\n{conv.persona.name} на связи (режим {conv.mode}). Команды: /mode <режим>, /tutor he|en|off, /quit\n")
     while True:
@@ -84,7 +84,7 @@ def voice_loop(conv: Conversation, bus: EventBus, cfg: dict) -> None:
     print("Загружаю распознавание речи, детектор и голос…")
     stt = make_stt(cfg["stt"], (HERE / cfg["models_dir"]).resolve())
     vad = make_vad(cfg["vad"])
-    tts = make_tts(cfg["tts"])
+    tts = make_tts(cfg["tts"], (HERE / cfg["models_dir"]).resolve())
     speaker = Speaker(tts.sample_rate)
     barge_in = cfg["audio"].get("barge_in", False)
 
@@ -170,9 +170,12 @@ def main() -> None:
     p.add_argument("--speak", action="store_true", help="в режиме --text отвечать голосом")
     p.add_argument("--mode", default="work", choices=["work", "evening", "private", "weekend"])
     p.add_argument("--tutor", choices=["he", "en"])
+    p.add_argument("--voice", choices=["silero", "f5"], help="движок голоса (вместо config.yaml)")
     p.add_argument("--model", help="файл модели в models/ (вместо указанного в config.yaml)")
     args = p.parse_args()
     cfg = load_config()
+    if args.voice:
+        cfg["tts"]["engine"] = args.voice
     if args.model:
         cfg["llm"]["model"] = args.model
     conv, bus = build(cfg, args.mode, args.tutor)

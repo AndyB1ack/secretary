@@ -1,0 +1,67 @@
+"""Сравнение голосов на одной фразе: Silero (xenia) и F5-TTS (живой, по образцу).
+
+  python scripts/voice_compare.py --record     — записать образец голоса (15 секунд)
+  python scripts/voice_compare.py              — сравнить
+  python scripts/voice_compare.py "своя фраза"
+"""
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+import sounddevice as sd
+import soundfile as sf
+
+HERE = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(HERE))
+VOICES = HERE.parent / "persona" / "voices"
+REF_WAV, REF_TXT = VOICES / "mira_ref.wav", VOICES / "mira_ref.txt"
+
+REF_SCRIPT = ("Привет! Меня зовут Мира. Сегодня отличный день, и я рада тебя слышать. "
+              "Давай посмотрим, что у нас по плану, а потом немного отдохнём.")
+PHRASE = "Привет, Андрей. Я соскучилась. Как прошёл день на объекте? Рассказывай, я вся внимание."
+
+
+def record() -> None:
+    VOICES.mkdir(parents=True, exist_ok=True)
+    print("Прочитай спокойно и с улыбкой, когда начнётся запись:\n\n  " + REF_SCRIPT + "\n")
+    for i in (3, 2, 1):
+        print(f"  {i}…"); time.sleep(1)
+    print("● Запись 15 секунд")
+    audio = sd.rec(int(15 * 24000), samplerate=24000, channels=1, dtype="float32"); sd.wait()
+    audio = audio[:, 0]
+    idx = np.where(np.abs(audio) > 0.02)[0]  # обрезаем тишину по краям
+    if len(idx):
+        audio = audio[max(0, idx[0] - 2400): idx[-1] + 4800]
+    sf.write(REF_WAV, audio, 24000)
+    REF_TXT.write_text(REF_SCRIPT, encoding="utf-8")
+    print(f"✓ Сохранено {REF_WAV.name} ({len(audio) / 24000:.1f} с). Прослушиваю:")
+    sd.play(audio, 24000); sd.wait()
+
+
+def compare(phrase: str) -> None:
+    import yaml
+    from secretary.engines import make_tts
+
+    cfg = yaml.safe_load(open(HERE / "config.yaml", encoding="utf-8"))
+    models = (HERE / cfg["models_dir"]).resolve()
+    if not REF_WAV.exists():
+        print("Нет образца голоса. Сначала: python scripts/voice_compare.py --record"); return
+    for engine in ["silero", "f5"]:
+        c = dict(cfg["tts"], engine=engine)
+        c["f5"] = {**c["f5"], "ref_audio": REF_WAV, "ref_text": REF_TXT}
+        print(f"\nЗагружаю {engine}…")
+        tts = make_tts(c, models)
+        tts.synthesize("Тест.")  # прогрев
+        t = time.monotonic()
+        audio = tts.synthesize(phrase)
+        dt = time.monotonic() - t
+        print(f"▶ {engine}: синтез {dt:.1f} с на {len(audio) / tts.sample_rate:.1f} с речи")
+        sd.play(audio, tts.sample_rate); sd.wait(); time.sleep(0.8)
+
+
+if __name__ == "__main__":
+    if "--record" in sys.argv:
+        record()
+    else:
+        compare(" ".join(a for a in sys.argv[1:]) or PHRASE)

@@ -26,11 +26,16 @@ vad:
   min_silence_ms: 700        # сколько тишины считать концом фразы
 
 tts:
-  engine: silero
+  engine: silero             # silero — быстрый; f5 — живой нейросетевой голос по образцу
   language: ru
   model_id: v4_ru
   speaker: xenia             # варианты: xenia, baya, kseniya, aidar, eugene
   sample_rate: 48000
+  f5:
+    ref_audio: ../persona/voices/mira_ref.wav   # образец голоса 10–20 с
+    ref_text: ../persona/voices/mira_ref.txt    # что сказано в образце
+    nfe_step: 16                                # 16 — быстро, 32 — чище
+    speed: 1.0
 
 audio:
   barge_in: false            # перебивание; включать только в наушниках, иначе она слышит сама себя

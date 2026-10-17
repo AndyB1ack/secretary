@@ -23,7 +23,10 @@ def make_vad(cfg: dict) -> VAD:
     raise ValueError(f"неизвестный движок VAD: {cfg['engine']}")
 
 
-def make_tts(cfg: dict) -> TTS:
+def make_tts(cfg: dict, models_dir=None) -> TTS:
+    if cfg["engine"] == "f5":
+        from .tts_f5 import F5TTS
+        return F5TTS(cfg["f5"], models_dir)
     if cfg["engine"] == "silero":
         from .tts_silero import SileroTTS
         return SileroTTS(cfg)
