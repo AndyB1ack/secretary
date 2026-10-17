@@ -165,6 +165,32 @@ class Practice:
         if self.lookups:
             lines.append("Словарь (точные данные из курса, опирайся на них — огласовки, ударение, перевод): " +
                          "; ".join(f"{t['nikud']} ({t['tr']}) — {t['ru']}" for t in self.lookups))
+        lines.append("Используй слова из списков выше и из словаря курса. Если нужно слово, которого там нет, — "
+                     "проверь себя: пиши только то, в чём уверена, и никогда не придумывай значения слов.")
         lines.append("Иврит всегда с огласовками и русской транслитерацией с ударением. Если слова нет в словаре "
                      "и ты не уверена в огласовке или ударении — так и скажи, не выдумывай.")
         return "\n".join(lines)
+
+
+HEB_WORD = re.compile(r"[א-ת֑-ׇ]+")
+PREFIXES = "והבלמשכ"
+FINALS = str.maketrans({"כ": "ך", "מ": "ם", "נ": "ן", "פ": "ף", "צ": "ץ"})
+
+
+def unknown_hebrew(text: str, index: dict[str, list[dict]]) -> list[str]:
+    """Слова на иврите из ответа, которых нет в словаре курса (с учётом приставок ו ה ב ל מ ש כ)."""
+    out = []
+    for raw in HEB_WORD.findall(text):
+        w = plain(raw)
+        if len(w) < 2:
+            continue
+        stems = {w} | {w[i:] for i in range(1, 3) if all(c in PREFIXES for c in w[:i]) and len(w) - i >= 2}
+        cands = set(stems)
+        for st in stems:  # мн. число и женский род: ים / ות / ה / ת, конечные буквы
+            for suf in ("ים", "ות", "ה", "ת"):
+                if st.endswith(suf) and len(st) - len(suf) >= 2:
+                    base = st[: -len(suf)]
+                    cands |= {base, base + "ה", base.translate(FINALS)}
+        if not any(c in index for c in cands) and raw not in out:
+            out.append(raw)
+    return out

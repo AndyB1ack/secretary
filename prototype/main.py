@@ -117,6 +117,8 @@ def text_loop(conv: Conversation, cfg: dict, speak: bool) -> None:
         for h in conv.last_hits:
             if h.image:
                 print(f"   🖼  {h.ref()}: {h.image}")
+        if getattr(conv, "unknown_he", None):
+            print(f"   ⚠ нет в словаре курса: {', '.join(conv.unknown_he)} — проверь (/word)")
         if getattr(conv, "bad_citations", None):
             print(f"   ⚠ ссылка на страницы {', '.join(conv.bad_citations)}, которых нет в найденном — проверь!")
         print(f"\n   [{_ms(time.monotonic() - t0)} всего" + (f", первый звук {_ms(first)}" if first else "") + "]")

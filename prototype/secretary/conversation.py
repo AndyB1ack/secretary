@@ -81,6 +81,10 @@ class Conversation:
             self.memory.add_message(self.mode, "user", user_text)
             self.memory.add_message(self.mode, "assistant", answer)
         self.bus.emit(ev.ASSISTANT_DONE, text=full, first_token_ms=first_token_ms)
+        self.unknown_he = []
+        if self.practice and self.persona.tutor:
+            from .tutor import unknown_hebrew
+            self.unknown_he = unknown_hebrew(full, self.practice._idx)
         self.bad_citations = check_citations(full, self.last_hits) if self.kb and not self.kb.empty else []
 
     def cancel(self) -> None:

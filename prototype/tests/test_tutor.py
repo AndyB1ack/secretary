@@ -25,3 +25,11 @@ def test_practice_modes():
     assert p.set_lesson(lesson["id"]) == lesson["title"] and "Урок" in p.prompt_block()
     word = t.course["terms"][0]
     assert p.lookup(word["he"])[0]["ru"] == word["ru"]
+
+
+def test_unknown_hebrew_flags_words_outside_course():
+    from secretary.tutor import Practice, unknown_hebrew
+    p = Practice(Tutor(sqlite3.connect(":memory:")))
+    known = next(t["he"] for t in p.t.course["terms"] if len(t["he"]) > 3 and " " not in t["he"])
+    assert unknown_hebrew(f"{known} ו{known}", p._idx) == []
+    assert unknown_hebrew("זרבובית־מומצאת", p._idx)
