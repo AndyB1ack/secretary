@@ -46,9 +46,12 @@ def make_sentences() -> None:
     cfg = yaml.safe_load(open(ROOT / "prototype" / "config.yaml", encoding="utf-8"))
     llm = make_llm(cfg["llm"], (ROOT / "prototype" / cfg["models_dir"]).resolve())
     have = {}
-    if SENT.exists():
-        for row in csv.reader(open(SENT, encoding="utf-8"), delimiter="\t"):
-            have.setdefault(row[0], set()).add(row[1])
+    if SENT.exists():  # перечитываем и чистим от служебных строк вроде «Вот десять реплик…:»
+        rows = [r for r in csv.reader(open(SENT, encoding="utf-8"), delimiter="\t") if len(r) == 2 and not junk(r[1])]
+        with open(SENT, "w", encoding="utf-8", newline="") as f0:
+            csv.writer(f0, delimiter="\t").writerows(rows)
+        for emo, s in rows:
+            have.setdefault(emo, set()).add(s)
     f = open(SENT, "a", encoding="utf-8", newline="")
     w = csv.writer(f, delimiter="\t")
     for emo in EMOTIONS:
@@ -61,12 +64,13 @@ def make_sentences() -> None:
             prompt = (f"Напиши 10 разных реплик молодой женщины в живом разговоре с близким знакомым Андреем. "
                       f"Тема: {topic}. Тон: {emo}. Каждая реплика — 1–2 предложения, 5–25 слов, разговорная речь, "
                       "разные по построению: вопросы, восклицания, короткие и длинные. Числа пиши словами. "
-                      "Только русские буквы, без латиницы, эмодзи и кавычек. Выведи списком, по одной на строке.")
+                      "Андрей — мужчина, обращайся к нему в мужском роде. Только русские буквы, без латиницы, эмодзи и кавычек. "
+                      "Выведи только сами реплики, без вступления и пояснений, по одной на строке.")
             text = "".join(llm.stream_chat([{"role": "user", "content": prompt}], 0.95))
             added = 0
             for line in text.splitlines():
                 s = re.sub(r"^\s*[\d\-–•*.)]+\s*", "", line).strip().strip('"«»')
-                if not (15 <= len(s) <= 200) or re.search(r"[A-Za-z\d<>\[\]{}#*_]", s) or s in got:
+                if not (15 <= len(s) <= 200) or re.search(r"[A-Za-z\d<>\[\]{}#*_]", s) or s in got or junk(s):
                     continue
                 if not re.search(r"[.!?…]$", s):
                     s += "."
@@ -74,6 +78,11 @@ def make_sentences() -> None:
             f.flush()
             print(f"  {emo}: {len(got)}/{need} (+{added}, тема «{topic}»)")
     f.close()
+
+
+def junk(s: str) -> bool:
+    """Служебные строки модели: «Вот десять реплик…:», «Конечно, вот…»."""
+    return bool(re.search(r"реплик|фраз[ыа]?\b.*:|:\s*\.?$|^конечно, вот", s.lower()))
 
 
 def norm(t: str) -> str:
