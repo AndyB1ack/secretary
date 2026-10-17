@@ -207,7 +207,7 @@ def speakable(text: str) -> str:
     """Оставляет то, что русский голос может прочитать: без еврейских букв и латиницы."""
     t = HEBREW.sub("", text)
     t = __import__("re").sub(r"\([^()]*[A-Za-z][^()]*\)", "", t)  # скобки с латиницей целиком
-    t = LATIN.sub("", t)
+    t = LATIN.sub("", t).replace("(", "").replace(")", "")
     t = __import__("re").sub(r"\s+", " ", t).strip(" ()—-,.!?:;")
     return t if __import__("re").search(r"[А-Яа-яЁё0-9]", t) else ""
 
