@@ -50,3 +50,11 @@ unity/[Uu]serSettings/
 persona/voices/*.wav
 persona/voices/*.mp3
 packs/
+native/llama.cpp/
+native/build-android/
+android/.gradle/
+android/local.properties
+android/app/build/
+android/lib/build/
+android/lib/.cxx/
+android/build/
